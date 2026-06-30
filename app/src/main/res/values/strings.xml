@@ -1,0 +1,28 @@
+<resources>
+    <string name="app_name">SAR Calendar</string>
+    <string name="title_calendar_2026">SAR Calendar</string>
+    <string name="note_saved">Note saved!</string>
+    <string name="note_hint">Enter note here...</string>
+    <string name="save_note">Add Notes</string>
+    <string name="remark_for">Notes for: %s</string>
+    <string name="all_personal_notes">All Personal Notes:</string>
+    <string name="archive_folder">Archive Notes:</string>
+    <string name="deleted_notes_title">Deleted Notes:</string>
+    <string name="no_deleted_notes">No deleted notes yet.</string>
+    <string name="delete_success">Note moved to trash</string>
+    <string name="no_archived_notes">No archived notes yet.</string>
+    <string name="archive_success">Note moved to archive</string>
+    <string name="no_notes_day">No notes for this day.</string>
+    <string name="no_notes_saved">No notes saved yet.</string>
+    <string name="sun">Sun</string>
+    <string name="mon">Mon</string>
+    <string name="tue">Tue</string>
+    <string name="wed">Wed</string>
+    <string name="thu">Thu</string>
+    <string name="fri">Fri</string>
+    <string name="sat">Sat</string>
+    <string name="prev_month">Previous Month</string>
+    <string name="next_month">Next Month</string>
+    <string name="note_flag">Note Flag</string>
+    <string name="deleted_notes_btn">Show Deleted Notes</string>
+</resources>
