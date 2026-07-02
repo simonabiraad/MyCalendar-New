@@ -135,7 +135,7 @@
 
             <EditText
                 android:id="@+id/noteInput"
-                android:layout_width="378dp"
+                android:layout_width="0dp"
                 android:layout_height="36dp"
                 android:layout_marginTop="16dp"
                 android:autofillHints="none"
@@ -148,25 +148,32 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/dayRemarksContainer" />
 
-            <Button
-                android:id="@+id/saveNoteButton"
+            <LinearLayout
+                android:id="@+id/buttonContainer"
                 android:layout_width="wrap_content"
-                android:layout_height="32dp"
+                android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:backgroundTint="@color/green"
-                android:paddingLeft="12dp"
-                android:paddingRight="12dp"
-                android:text="@string/save_note"
-                android:textSize="11sp"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
+                android:orientation="horizontal"
                 app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/noteInput" />
+                app:layout_constraintTop_toBottomOf="@id/noteInput">
+
+                <Button
+                    android:id="@+id/saveNoteButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:backgroundTint="@color/green"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:paddingLeft="12dp"
+                    android:paddingRight="12dp"
+                    android:text="@string/save_note"
+                    android:textSize="11sp" />
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/remarkHistoryTitle"
-                android:layout_width="379dp"
-                android:layout_height="37dp"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:background="#444444"
                 android:padding="8dp"
@@ -176,7 +183,7 @@
                 android:textStyle="bold"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/saveNoteButton" />
+                app:layout_constraintTop_toBottomOf="@id/buttonContainer" />
 
             <LinearLayout
                 android:id="@+id/remarkHistoryContainer"
@@ -190,8 +197,8 @@
 
             <TextView
                 android:id="@+id/archiveHistoryTitle"
-                android:layout_width="380dp"
-                android:layout_height="35dp"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
                 android:background="#444444"
                 android:clickable="true"
@@ -217,8 +224,8 @@
 
             <TextView
                 android:id="@+id/deletedHistoryTitle"
-                android:layout_width="384dp"
-                android:layout_height="37dp"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
                 android:background="#444444"
                 android:clickable="true"
@@ -243,6 +250,20 @@
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/deletedHistoryTitle" />
+
+            <Button
+                android:id="@+id/notificationSettingsButton"
+                android:layout_width="34dp"
+                android:layout_height="25dp"
+                android:backgroundTint="@color/green"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:paddingLeft="12dp"
+                android:paddingRight="12dp"
+                android:text="🔔"
+                android:textSize="11sp"
+                tools:layout_editor_absoluteX="-1dp"
+                tools:layout_editor_absoluteY="475dp" />
 
         </androidx.constraintlayout.widget.ConstraintLayout>
     </ScrollView>

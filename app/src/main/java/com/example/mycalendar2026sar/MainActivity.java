@@ -10,6 +10,7 @@ import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -154,6 +155,20 @@ public class MainActivity extends AppCompatActivity {
         });
         
         saveNoteButton.setOnClickListener(v -> saveNote());
+        
+        findViewById(R.id.notificationSettingsButton).setOnClickListener(v -> {
+            Intent intent = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS);
+            intent.putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+            intent.putExtra(Settings.EXTRA_CHANNEL_ID, "calendar_reminder_channel");
+            try {
+                startActivity(intent);
+            } catch (Exception e) {
+                Intent fallback = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+                fallback.putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+                startActivity(fallback);
+            }
+        });
+
         prevMonth.setOnClickListener(v -> {
             calendar.add(Calendar.MONTH, -1);
             updateCalendar();
@@ -748,11 +763,11 @@ public class MainActivity extends AppCompatActivity {
         deletedHistoryContainer.removeAllViews();
 
         // Count active notes (Today & Future)
-        int activeCount = sharedPreferences.getAll().size();
-        TextView title = findViewById(R.id.remarkHistoryTitle);
-        if (title != null) {
+        int activeCount = countTotalNotes(sharedPreferences);
+        TextView activeTitle = findViewById(R.id.remarkHistoryTitle);
+        if (activeTitle != null) {
             String countText = getString(R.string.all_personal_notes) + " (" + activeCount + ")";
-            title.setText(countText);
+            activeTitle.setText(countText);
         }
 
         // Show active personal notes (Today & Future)
@@ -767,8 +782,24 @@ public class MainActivity extends AppCompatActivity {
         archiveBtn.setOnClickListener(v -> archiveAllPastNotes());
         remarkHistoryContainer.addView(archiveBtn);
 
+        // Count archived notes
+        int archiveCount = countTotalNotes(archivePreferences);
+        TextView archiveTitle = findViewById(R.id.archiveHistoryTitle);
+        if (archiveTitle != null) {
+            String countText = getString(R.string.archive_folder) + " (" + archiveCount + ")";
+            archiveTitle.setText(countText);
+        }
+
         // Show archived notes
         loadHistoryFromPrefs(archivePreferences, archiveHistoryContainer, R.string.no_archived_notes, Color.YELLOW);
+
+        // Count deleted notes
+        int deletedCount = countTotalNotes(deletedPreferences);
+        TextView deletedTitle = findViewById(R.id.deletedHistoryTitle);
+        if (deletedTitle != null) {
+            String countText = getString(R.string.deleted_notes_title) + " (" + deletedCount + ")";
+            deletedTitle.setText(countText);
+        }
 
         // Show deleted notes in RED
         loadHistoryFromPrefs(deletedPreferences, deletedHistoryContainer, R.string.no_deleted_notes, Color.RED);
@@ -790,6 +821,20 @@ public class MainActivity extends AppCompatActivity {
                 .setNegativeButton("No", null)
                 .show());
         deletedHistoryContainer.addView(clearTrashBtn);
+    }
+
+    private int countTotalNotes(SharedPreferences prefs) {
+        int count = 0;
+        Map<String, ?> allEntries = prefs.getAll();
+        for (Object entry : allEntries.values()) {
+            if (entry != null) {
+                String val = entry.toString();
+                if (!val.isEmpty()) {
+                    count += val.split("\n").length;
+                }
+            }
+        }
+        return count;
     }
 
     private void archiveAllPastNotes() {
