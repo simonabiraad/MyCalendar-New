@@ -36,7 +36,10 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.core.content.FileProvider;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -304,7 +307,8 @@ public class MainActivity extends AppCompatActivity {
         
         // Check if a reminder is set for this specific note
         String reminderKey = currentDateKey + "_" + remarkText;
-        if (reminderPreferences.getBoolean(reminderKey, false)) {
+        boolean hasReminder = reminderPreferences.contains(reminderKey);
+        if (hasReminder) {
             alarmButton.setImageTintList(ColorStateList.valueOf(Color.GREEN));
         } else {
             alarmButton.setImageTintList(null); // Keep original color
@@ -315,13 +319,25 @@ public class MainActivity extends AppCompatActivity {
         horizontalLayout.addView(createActionButton(android.R.drawable.ic_menu_edit, btnParams, v -> showEditDialog(remarkText, index, sourcePrefs)));
 
         horizontalLayout.addView(createActionButton(android.R.drawable.ic_menu_share, btnParams, v -> {
-            String textToShare = remarkText.startsWith("• ") ? remarkText.substring(2) : remarkText;
-            Intent sendIntent = new Intent();
-            sendIntent.setAction(Intent.ACTION_SEND);
-            sendIntent.putExtra(Intent.EXTRA_TEXT, textToShare);
-            sendIntent.setType("text/plain");
-            Intent shareIntent = Intent.createChooser(sendIntent, "Share Note via");
-            startActivity(shareIntent);
+            String[] options = {"Share as Text", "Share as .ics File"};
+            new AlertDialog.Builder(this)
+                    .setTitle("Share Note")
+                    .setItems(options, (dialog, which) -> {
+                        if (which == 0) {
+                            String noteBody = remarkText.startsWith("• ") ? remarkText.substring(2) : remarkText;
+                            String shareText = "SAR CALENDAR REMINDER:\n" + noteBody + "\nDate: " + currentDateKey;
+                            if (hasReminder) {
+                                shareText += "\n(Check SAR Calendar to sync this reminder)";
+                            }
+                            Intent sendIntent = new Intent(Intent.ACTION_SEND);
+                            sendIntent.putExtra(Intent.EXTRA_TEXT, shareText);
+                            sendIntent.setType("text/plain");
+                            startActivity(Intent.createChooser(sendIntent, "Share Note via"));
+                        } else {
+                            shareNoteAsIcs(remarkText, currentDateKey);
+                        }
+                    })
+                    .show();
         }));
 
         ImageButton archiveButton = createArchiveButton(btnParams, index, sourcePrefs);
@@ -330,6 +346,75 @@ public class MainActivity extends AppCompatActivity {
         horizontalLayout.addView(createActionButton(android.R.drawable.ic_menu_delete, btnParams, v -> deleteRemark(index, sourcePrefs)));
         
         dayRemarksContainer.addView(horizontalLayout);
+    }
+
+    private void shareNoteAsIcs(String noteText, String dateKey) {
+        String noteBody = noteText.startsWith("• ") ? noteText.substring(2) : noteText;
+        String reminderKey = dateKey + "_" + noteText;
+        String savedTime = reminderPreferences.getString(reminderKey, null);
+
+        // Prepare ICS content
+        String icsContent = "BEGIN:VCALENDAR\n" +
+                "VERSION:2.0\n" +
+                "PRODID:-//SAR Calendar//EN\n" +
+                "BEGIN:VEVENT\n" +
+                "SUMMARY:" + noteBody + "\n";
+        
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
+            Date date = sdf.parse(dateKey);
+            if (date != null) {
+                if (savedTime != null && savedTime.contains(":")) {
+                    String[] parts = savedTime.split(":");
+                    Calendar cal = Calendar.getInstance();
+                    cal.setTime(date);
+                    cal.set(Calendar.HOUR_OF_DAY, Integer.parseInt(parts[0]));
+                    cal.set(Calendar.MINUTE, Integer.parseInt(parts[1]));
+                    cal.set(Calendar.SECOND, 0);
+                    
+                    SimpleDateFormat icsSdf = new SimpleDateFormat("yyyyMMdd'T'HHmmss", Locale.getDefault());
+                    String dateStr = icsSdf.format(cal.getTime());
+                    icsContent += "DTSTART:" + dateStr + "\n";
+                    
+                    // Add 30 mins for end time
+                    cal.add(Calendar.MINUTE, 30);
+                    String endDateStr = icsSdf.format(cal.getTime());
+                    icsContent += "DTEND:" + endDateStr + "\n";
+                } else {
+                    SimpleDateFormat icsSdf = new SimpleDateFormat("yyyyMMdd", Locale.getDefault());
+                    String dateStr = icsSdf.format(date);
+                    icsContent += "DTSTART;VALUE=DATE:" + dateStr + "\n" +
+                            "DTEND;VALUE=DATE:" + dateStr + "\n";
+                }
+            }
+        } catch (Exception ignored) {}
+        
+        icsContent += "DESCRIPTION:SAR Calendar Note\n" +
+                "END:VEVENT\n" +
+                "END:VCALENDAR";
+
+        try {
+            // Create temporary file
+            File cachePath = new File(getCacheDir(), "shared_notes");
+            cachePath.mkdirs();
+            File icsFile = new File(cachePath, "note_reminder.ics");
+            FileOutputStream stream = new FileOutputStream(icsFile);
+            stream.write(icsContent.getBytes());
+            stream.close();
+
+            // Get URI using FileProvider
+            android.net.Uri contentUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", icsFile);
+
+            // Create share intent
+            Intent intent = new Intent(Intent.ACTION_SEND);
+            intent.setType("text/calendar");
+            intent.putExtra(Intent.EXTRA_STREAM, contentUri);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(intent, "Share Note via"));
+
+        } catch (Exception e) {
+            Toast.makeText(this, "Error creating .ics file", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private TextView createRemarkTextView(String remarkText) {
@@ -531,10 +616,11 @@ public class MainActivity extends AppCompatActivity {
 
         // Save reminder status and refresh UI
         String reminderKey = currentDateKey + "_" + noteText;
-        reminderPreferences.edit().putBoolean(reminderKey, true).apply();
+        String timeValue = String.format(Locale.getDefault(), "%02d:%02d", hour, minute);
+        reminderPreferences.edit().putString(reminderKey, timeValue).apply();
         loadRemarksForSelectedDate();
 
-        Toast.makeText(this, "Reminder set for " + String.format(Locale.getDefault(), "%02d:%02d", hour, minute), Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Reminder set for " + timeValue, Toast.LENGTH_SHORT).show();
     }
 
     private void showEditDialog(String currentText, int index, SharedPreferences sourcePrefs) {
@@ -984,13 +1070,23 @@ public class MainActivity extends AppCompatActivity {
                 shareBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
                 noteLayout.addView(shareBtn, new LinearLayout.LayoutParams(iconSize, iconSize));
                 shareBtn.setOnClickListener(v -> {
-                    String textToShare = noteText.startsWith("• ") ? noteText.substring(2) : noteText;
-                    Intent sendIntent = new Intent();
-                    sendIntent.setAction(Intent.ACTION_SEND);
-                    sendIntent.putExtra(Intent.EXTRA_TEXT, textToShare);
-                    sendIntent.setType("text/plain");
-                    Intent shareIntent = Intent.createChooser(sendIntent, "Share Note via");
-                    startActivity(shareIntent);
+                    String[] options = {"Share as Text", "Share as .ics File"};
+                    new AlertDialog.Builder(this)
+                            .setTitle("Share Note")
+                            .setItems(options, (dialog, which) -> {
+                                if (which == 0) {
+                                    String textToShare = noteText.startsWith("• ") ? noteText.substring(2) : noteText;
+                                    Intent sendIntent = new Intent();
+                                    sendIntent.setAction(Intent.ACTION_SEND);
+                                    sendIntent.putExtra(Intent.EXTRA_TEXT, textToShare);
+                                    sendIntent.setType("text/plain");
+                                    Intent shareIntent = Intent.createChooser(sendIntent, "Share Note via");
+                                    startActivity(shareIntent);
+                                } else {
+                                    shareNoteAsIcs(noteText, dateKey);
+                                }
+                            })
+                            .show();
                 });
 
                 if (container == archiveHistoryContainer || container == deletedHistoryContainer) {
