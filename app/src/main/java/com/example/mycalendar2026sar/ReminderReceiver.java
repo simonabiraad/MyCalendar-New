@@ -6,6 +6,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 
+import android.graphics.Color;
 import android.media.RingtoneManager;
 import android.os.Build;
 
@@ -29,6 +30,7 @@ public class ReminderReceiver extends BroadcastReceiver {
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, channelId)
                 .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                .setColor(Color.GREEN)
                 .setContentTitle("SAR Calendar Reminder")
                 .setContentText(noteText)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)

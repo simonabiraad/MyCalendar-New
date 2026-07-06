@@ -64,6 +64,7 @@ public class MainActivity extends AppCompatActivity {
     private SharedPreferences sharedPreferences;
     private SharedPreferences archivePreferences;
     private SharedPreferences deletedPreferences;
+    private SharedPreferences reminderPreferences;
     private CalendarAdapter adapter;
 
     private String lastDeletedNote;
@@ -113,6 +114,7 @@ public class MainActivity extends AppCompatActivity {
         sharedPreferences = getSharedPreferences("CalendarNotes", Context.MODE_PRIVATE);
         archivePreferences = getSharedPreferences("ArchivedNotes", Context.MODE_PRIVATE);
         deletedPreferences = getSharedPreferences("DeletedNotes", Context.MODE_PRIVATE);
+        reminderPreferences = getSharedPreferences("ReminderStatus", Context.MODE_PRIVATE);
 
         // Hide folders initially
         archiveHistoryContainer.setVisibility(View.GONE);
@@ -155,7 +157,7 @@ public class MainActivity extends AppCompatActivity {
         });
         
         saveNoteButton.setOnClickListener(v -> saveNote());
-        
+
         findViewById(R.id.notificationSettingsButton).setOnClickListener(v -> {
             Intent intent = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS);
             intent.putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
@@ -298,9 +300,30 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(iconSize, iconSize);
         btnParams.setMargins(4, 0, 4, 0);
 
-        horizontalLayout.addView(createActionButton(android.R.drawable.ic_lock_idle_alarm, btnParams, v -> showTimePickerDialog(remarkText)));
-        horizontalLayout.addView(createActionButton(android.R.drawable.ic_menu_edit, btnParams, v -> showEditDialog(remarkText, index, sourcePrefs)));
+        ImageButton alarmButton = createActionButton(android.R.drawable.ic_lock_idle_alarm, btnParams, v -> showTimePickerDialog(remarkText));
         
+        // Check if a reminder is set for this specific note
+        String reminderKey = currentDateKey + "_" + remarkText;
+        if (reminderPreferences.getBoolean(reminderKey, false)) {
+            alarmButton.setImageTintList(ColorStateList.valueOf(Color.GREEN));
+        } else {
+            alarmButton.setImageTintList(null); // Keep original color
+        }
+        
+        horizontalLayout.addView(alarmButton);
+
+        horizontalLayout.addView(createActionButton(android.R.drawable.ic_menu_edit, btnParams, v -> showEditDialog(remarkText, index, sourcePrefs)));
+
+        horizontalLayout.addView(createActionButton(android.R.drawable.ic_menu_share, btnParams, v -> {
+            String textToShare = remarkText.startsWith("• ") ? remarkText.substring(2) : remarkText;
+            Intent sendIntent = new Intent();
+            sendIntent.setAction(Intent.ACTION_SEND);
+            sendIntent.putExtra(Intent.EXTRA_TEXT, textToShare);
+            sendIntent.setType("text/plain");
+            Intent shareIntent = Intent.createChooser(sendIntent, "Share Note via");
+            startActivity(shareIntent);
+        }));
+
         ImageButton archiveButton = createArchiveButton(btnParams, index, sourcePrefs);
         horizontalLayout.addView(archiveButton);
 
@@ -505,6 +528,11 @@ public class MainActivity extends AppCompatActivity {
         PendingIntent pendingIntent = PendingIntent.getBroadcast(this, (int) System.currentTimeMillis(), intent, PendingIntent.FLAG_IMMUTABLE);
 
         alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, reminderTime.getTimeInMillis(), pendingIntent);
+
+        // Save reminder status and refresh UI
+        String reminderKey = currentDateKey + "_" + noteText;
+        reminderPreferences.edit().putBoolean(reminderKey, true).apply();
+        loadRemarksForSelectedDate();
 
         Toast.makeText(this, "Reminder set for " + String.format(Locale.getDefault(), "%02d:%02d", hour, minute), Toast.LENGTH_SHORT).show();
     }
@@ -768,6 +796,7 @@ public class MainActivity extends AppCompatActivity {
         if (activeTitle != null) {
             String countText = getString(R.string.all_personal_notes) + " (" + activeCount + ")";
             activeTitle.setText(countText);
+            activeTitle.setTextColor(Color.GREEN);
         }
 
         // Show active personal notes (Today & Future)
@@ -788,6 +817,7 @@ public class MainActivity extends AppCompatActivity {
         if (archiveTitle != null) {
             String countText = getString(R.string.archive_folder) + " (" + archiveCount + ")";
             archiveTitle.setText(countText);
+            archiveTitle.setTextColor(Color.YELLOW);
         }
 
         // Show archived notes
@@ -799,6 +829,7 @@ public class MainActivity extends AppCompatActivity {
         if (deletedTitle != null) {
             String countText = getString(R.string.deleted_notes_title) + " (" + deletedCount + ")";
             deletedTitle.setText(countText);
+            deletedTitle.setTextColor(Color.RED);
         }
 
         // Show deleted notes in RED
@@ -943,9 +974,26 @@ public class MainActivity extends AppCompatActivity {
                 tv.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
                 noteLayout.addView(tv);
 
+                int iconSize = (int) (28 * getResources().getDisplayMetrics().density);
+
+                // Share button for all history notes
+                ImageButton shareBtn = new ImageButton(this);
+                shareBtn.setImageResource(android.R.drawable.ic_menu_share);
+                shareBtn.setBackgroundColor(Color.TRANSPARENT);
+                shareBtn.setPadding(4, 4, 4, 4);
+                shareBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                noteLayout.addView(shareBtn, new LinearLayout.LayoutParams(iconSize, iconSize));
+                shareBtn.setOnClickListener(v -> {
+                    String textToShare = noteText.startsWith("• ") ? noteText.substring(2) : noteText;
+                    Intent sendIntent = new Intent();
+                    sendIntent.setAction(Intent.ACTION_SEND);
+                    sendIntent.putExtra(Intent.EXTRA_TEXT, textToShare);
+                    sendIntent.setType("text/plain");
+                    Intent shareIntent = Intent.createChooser(sendIntent, "Share Note via");
+                    startActivity(shareIntent);
+                });
+
                 if (container == archiveHistoryContainer || container == deletedHistoryContainer) {
-                    int iconSize = (int) (28 * getResources().getDisplayMetrics().density);
-                    
                     // Restore button
                     ImageButton restoreBtn = new ImageButton(this);
                     restoreBtn.setImageResource(android.R.drawable.ic_menu_revert);
@@ -1039,13 +1087,19 @@ public class MainActivity extends AppCompatActivity {
             String key = sdf.format(date);
             String savedNotes = sharedPreferences.getString(key, "");
             String archivedNotes = archivePreferences.getString(key, "");
-            boolean hasNotes = !savedNotes.isEmpty() || !archivedNotes.isEmpty();
+            boolean hasPersonalNotes = !savedNotes.isEmpty();
+            boolean hasArchivedNotes = !archivedNotes.isEmpty();
+            boolean hasNotes = hasPersonalNotes || hasArchivedNotes;
 
             flag.setVisibility(hasNotes ? View.VISIBLE : View.INVISIBLE);
 
-            if (hasNotes) {
-                dayText.setTextColor(Color.WHITE);
-            } else if (cellCal.get(Calendar.MONTH) != currentMonth.get(Calendar.MONTH)) {
+            if (hasPersonalNotes) {
+                flag.setImageTintList(ColorStateList.valueOf(Color.GREEN));
+            } else if (hasArchivedNotes) {
+                flag.setImageTintList(ColorStateList.valueOf(Color.YELLOW));
+            }
+
+            if (cellCal.get(Calendar.MONTH) != currentMonth.get(Calendar.MONTH)) {
                 dayText.setTextColor(Color.GRAY);
             } else {
                 dayText.setTextColor(Color.WHITE);
