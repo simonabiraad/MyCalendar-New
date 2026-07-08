@@ -116,7 +116,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:text="@string/remark_for"
-                android:textColor="@color/white"
+                android:textColor="@color/green"
                 android:textSize="18sp"
                 android:textStyle="bold"
                 app:layout_constraintEnd_toEndOf="parent"
@@ -260,10 +260,10 @@
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 android:padding="0dp"
-                android:text="🔔"
+                android:text="@string/notification_icon"
                 android:textSize="11sp"
-                tools:layout_editor_absoluteX="7dp"
-                tools:layout_editor_absoluteY="6dp" />
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
 
         </androidx.constraintlayout.widget.ConstraintLayout>
     </ScrollView>

@@ -1,6 +1,7 @@
 package com.example.mycalendar2026sar;
 
 import android.app.AlarmManager;
+import android.app.DatePickerDialog;
 import android.app.PendingIntent;
 import android.app.TimePickerDialog;
 import android.content.Context;
@@ -48,6 +49,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -109,7 +111,7 @@ public class MainActivity extends AppCompatActivity {
         archiveHistoryContainer = findViewById(R.id.archiveHistoryContainer);
         deletedHistoryContainer = findViewById(R.id.deletedHistoryContainer);
         mainScrollView = findViewById(R.id.mainScrollView);
-        
+
         Button saveNoteButton = findViewById(R.id.saveNoteButton);
         ImageButton prevMonth = findViewById(R.id.prevMonth);
         ImageButton nextMonth = findViewById(R.id.nextMonth);
@@ -140,6 +142,7 @@ public class MainActivity extends AppCompatActivity {
                 remarkHistoryContainer.setVisibility(View.GONE);
             } else {
                 remarkHistoryContainer.setVisibility(View.VISIBLE);
+                mainScrollView.post(() -> mainScrollView.smoothScrollTo(0, findViewById(R.id.remarkHistoryTitle).getTop()));
             }
         });
 
@@ -148,6 +151,7 @@ public class MainActivity extends AppCompatActivity {
                 archiveHistoryContainer.setVisibility(View.GONE);
             } else {
                 archiveHistoryContainer.setVisibility(View.VISIBLE);
+                mainScrollView.post(() -> mainScrollView.smoothScrollTo(0, findViewById(R.id.archiveHistoryTitle).getTop()));
             }
         });
 
@@ -156,6 +160,7 @@ public class MainActivity extends AppCompatActivity {
                 deletedHistoryContainer.setVisibility(View.GONE);
             } else {
                 deletedHistoryContainer.setVisibility(View.VISIBLE);
+                mainScrollView.post(() -> mainScrollView.smoothScrollTo(0, findViewById(R.id.deletedHistoryTitle).getTop()));
             }
         });
         
@@ -214,7 +219,8 @@ public class MainActivity extends AppCompatActivity {
             try {
                 Date noteDate = sdf.parse(dateKey);
                 if (noteDate != null && noteDate.before(archiveThreshold)) {
-                    String value = entry.getValue().toString();
+                    Object valObj = entry.getValue();
+                    String value = valObj != null ? valObj.toString() : "";
                     if (!value.isEmpty()) {
                         String existingDeleted = deletedPreferences.getString(dateKey, "");
                         String updatedDeleted = existingDeleted.isEmpty() ? value : existingDeleted + "\n" + value;
@@ -303,7 +309,7 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(iconSize, iconSize);
         btnParams.setMargins(4, 0, 4, 0);
 
-        ImageButton alarmButton = createActionButton(android.R.drawable.ic_lock_idle_alarm, btnParams, v -> showTimePickerDialog(remarkText));
+        ImageButton alarmButton = createActionButton(android.R.drawable.ic_lock_idle_alarm, btnParams, v -> manageReminder(remarkText));
         
         // Check if a reminder is set for this specific note
         String reminderKey = currentDateKey + "_" + remarkText;
@@ -364,27 +370,41 @@ public class MainActivity extends AppCompatActivity {
             SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
             Date date = sdf.parse(dateKey);
             if (date != null) {
-                if (savedTime != null && savedTime.contains(":")) {
-                    String[] parts = savedTime.split(":");
+                if (savedTime != null) {
+                    SimpleDateFormat reminderSdf = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault());
                     Calendar cal = Calendar.getInstance();
-                    cal.setTime(date);
-                    cal.set(Calendar.HOUR_OF_DAY, Integer.parseInt(parts[0]));
-                    cal.set(Calendar.MINUTE, Integer.parseInt(parts[1]));
-                    cal.set(Calendar.SECOND, 0);
-                    
-                    SimpleDateFormat icsSdf = new SimpleDateFormat("yyyyMMdd'T'HHmmss", Locale.getDefault());
-                    String dateStr = icsSdf.format(cal.getTime());
-                    icsContent += "DTSTART:" + dateStr + "\n";
-                    
-                    // Add 30 mins for end time
-                    cal.add(Calendar.MINUTE, 30);
-                    String endDateStr = icsSdf.format(cal.getTime());
-                    icsContent += "DTEND:" + endDateStr + "\n";
+                    boolean parsed = false;
+                    try {
+                        Date fullDate = reminderSdf.parse(savedTime);
+                        if (fullDate != null) {
+                            cal.setTime(fullDate);
+                            parsed = true;
+                        }
+                    } catch (Exception e) {
+                        // Fallback for old HH:mm format
+                        if (savedTime.contains(":")) {
+                            String[] parts = savedTime.split(":");
+                            cal.setTime(date);
+                            cal.set(Calendar.HOUR_OF_DAY, Integer.parseInt(parts[0]));
+                            cal.set(Calendar.MINUTE, Integer.parseInt(parts[1]));
+                            cal.set(Calendar.SECOND, 0);
+                            parsed = true;
+                        }
+                    }
+
+                    if (parsed) {
+                        SimpleDateFormat icsSdf = new SimpleDateFormat("yyyyMMdd'T'HHmmss", Locale.getDefault());
+                        String dateStr = icsSdf.format(cal.getTime());
+                        icsContent += "DTSTART:" + dateStr + "\n";
+                        
+                        cal.add(Calendar.MINUTE, 30);
+                        String endDateStr = icsSdf.format(cal.getTime());
+                        icsContent += "DTEND:" + endDateStr + "\n";
+                    } else {
+                        addDefaultIcsDates(icsContent, date);
+                    }
                 } else {
-                    SimpleDateFormat icsSdf = new SimpleDateFormat("yyyyMMdd", Locale.getDefault());
-                    String dateStr = icsSdf.format(date);
-                    icsContent += "DTSTART;VALUE=DATE:" + dateStr + "\n" +
-                            "DTEND;VALUE=DATE:" + dateStr + "\n";
+                    icsContent = addDefaultIcsDates(icsContent, date);
                 }
             }
         } catch (Exception ignored) {}
@@ -396,7 +416,10 @@ public class MainActivity extends AppCompatActivity {
         try {
             // Create temporary file
             File cachePath = new File(getCacheDir(), "shared_notes");
-            cachePath.mkdirs();
+            if (!cachePath.exists() && !cachePath.mkdirs()) {
+                Toast.makeText(this, "Failed to create directory", Toast.LENGTH_SHORT).show();
+                return;
+            }
             File icsFile = new File(cachePath, "note_reminder.ics");
             FileOutputStream stream = new FileOutputStream(icsFile);
             stream.write(icsContent.getBytes());
@@ -491,7 +514,7 @@ public class MainActivity extends AppCompatActivity {
             }
             
             updateRemarkHistory();
-            if (dateKey.equals(currentDateKey)) {
+            if (Objects.equals(dateKey, currentDateKey)) {
                 loadRemarksForSelectedDate();
             }
             adapter.notifyDataSetChanged();
@@ -520,7 +543,7 @@ public class MainActivity extends AppCompatActivity {
             }
 
             updateRemarkHistory();
-            if (dateKey.equals(currentDateKey)) {
+            if (Objects.equals(dateKey, currentDateKey)) {
                 loadRemarksForSelectedDate();
             }
             adapter.notifyDataSetChanged();
@@ -585,42 +608,101 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void showTimePickerDialog(String noteText) {
-        Calendar currentTime = Calendar.getInstance();
-        int hour = currentTime.get(Calendar.HOUR_OF_DAY);
-        int minute = currentTime.get(Calendar.MINUTE);
-
-        TimePickerDialog timePickerDialog = new TimePickerDialog(this, (view, selectedHour, selectedMinute) -> setReminder(selectedHour, selectedMinute, noteText), hour, minute, true);
-        timePickerDialog.setTitle("Set Reminder Time");
-        timePickerDialog.show();
+    private String addDefaultIcsDates(String icsContent, Date date) {
+        SimpleDateFormat icsSdf = new SimpleDateFormat("yyyyMMdd", Locale.getDefault());
+        String dateStr = icsSdf.format(date);
+        return icsContent + "DTSTART;VALUE=DATE:" + dateStr + "\n" +
+                "DTEND;VALUE=DATE:" + dateStr + "\n";
     }
 
-    private void setReminder(int hour, int minute, String noteText) {
-        Calendar reminderTime = (Calendar) selectedDate.clone();
-        reminderTime.set(Calendar.HOUR_OF_DAY, hour);
-        reminderTime.set(Calendar.MINUTE, minute);
-        reminderTime.set(Calendar.SECOND, 0);
+    private void manageReminder(String noteText) {
+        String reminderKey = currentDateKey + "_" + noteText;
+        String savedValue = reminderPreferences.getString(reminderKey, null);
 
+        if (savedValue != null) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Manage Reminder")
+                    .setMessage("Currently set for: " + savedValue)
+                    .setPositiveButton("Edit", (dialog, which) -> showReminderPicker(noteText))
+                    .setNegativeButton("Delete", (dialog, which) -> deleteReminder(noteText))
+                    .setNeutralButton("Cancel", null)
+                    .show();
+        } else {
+            showReminderPicker(noteText);
+        }
+    }
+
+    private void showReminderPicker(String noteText) {
+        Calendar current = Calendar.getInstance();
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
+            Date noteDate = sdf.parse(currentDateKey);
+            if (noteDate != null) {
+                current.setTime(noteDate);
+                Calendar now = Calendar.getInstance();
+                if (current.before(now)) {
+                    current.set(Calendar.HOUR_OF_DAY, now.get(Calendar.HOUR_OF_DAY));
+                    current.set(Calendar.MINUTE, now.get(Calendar.MINUTE));
+                    current.add(Calendar.MINUTE, 5);
+                }
+            }
+        } catch (Exception ignored) {}
+
+        new DatePickerDialog(this, (view, year, month, day) -> {
+            Calendar pickedDate = Calendar.getInstance();
+            pickedDate.set(year, month, day);
+
+            new TimePickerDialog(this, (v, hour, minute) -> {
+                pickedDate.set(Calendar.HOUR_OF_DAY, hour);
+                pickedDate.set(Calendar.MINUTE, minute);
+                pickedDate.set(Calendar.SECOND, 0);
+                setReminder(pickedDate, noteText);
+            }, current.get(Calendar.HOUR_OF_DAY), current.get(Calendar.MINUTE), true).show();
+
+        }, current.get(Calendar.YEAR), current.get(Calendar.MONTH), current.get(Calendar.DAY_OF_MONTH)).show();
+    }
+
+    private void setReminder(Calendar reminderTime, String noteText) {
         if (reminderTime.before(Calendar.getInstance())) {
             Toast.makeText(this, "Cannot set reminder in the past!", Toast.LENGTH_SHORT).show();
             return;
         }
 
+        String reminderKey = currentDateKey + "_" + noteText;
+        int requestCode = reminderKey.hashCode();
+
         AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
         Intent intent = new Intent(this, ReminderReceiver.class);
         intent.putExtra("noteText", noteText);
         
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, (int) System.currentTimeMillis(), intent, PendingIntent.FLAG_IMMUTABLE);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, reminderTime.getTimeInMillis(), pendingIntent);
 
-        // Save reminder status and refresh UI
-        String reminderKey = currentDateKey + "_" + noteText;
-        String timeValue = String.format(Locale.getDefault(), "%02d:%02d", hour, minute);
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault());
+        String timeValue = sdf.format(reminderTime.getTime());
         reminderPreferences.edit().putString(reminderKey, timeValue).apply();
+        
         loadRemarksForSelectedDate();
-
         Toast.makeText(this, "Reminder set for " + timeValue, Toast.LENGTH_SHORT).show();
+    }
+
+    private void deleteReminder(String noteText) {
+        String reminderKey = currentDateKey + "_" + noteText;
+        int requestCode = reminderKey.hashCode();
+
+        AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+        Intent intent = new Intent(this, ReminderReceiver.class);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, requestCode, intent, PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE);
+        
+        if (pendingIntent != null) {
+            alarmManager.cancel(pendingIntent);
+            pendingIntent.cancel();
+        }
+
+        reminderPreferences.edit().remove(reminderKey).apply();
+        loadRemarksForSelectedDate();
+        Toast.makeText(this, "Reminder deleted", Toast.LENGTH_SHORT).show();
     }
 
     private void showEditDialog(String currentText, int index, SharedPreferences sourcePrefs) {
@@ -814,7 +896,7 @@ public class MainActivity extends AppCompatActivity {
         targetPrefs.edit().putString(lastDeletedDateKey, updatedRemarks).apply();
 
         // If we are still on the same date, refresh the view
-        if (lastDeletedDateKey.equals(currentDateKey)) {
+        if (Objects.equals(lastDeletedDateKey, currentDateKey)) {
             loadRemarksForSelectedDate();
         }
 
@@ -1030,15 +1112,16 @@ public class MainActivity extends AppCompatActivity {
         });
 
         for (String dateKey : sortedKeys) {
-            String value = allEntries.get(dateKey).toString();
+            Object valObj = allEntries.get(dateKey);
+            String value = valObj != null ? valObj.toString() : "";
             if (value.isEmpty()) continue;
             String[] notes = value.split("\n");
 
             // Date Header
             TextView dateHeader = new TextView(this);
-            String label = dateKey.equals(todayKey) ? "TODAY: " + dateKey : "Date: " + dateKey;
+            String label = Objects.equals(dateKey, todayKey) ? "TODAY: " + dateKey : "Date: " + dateKey;
             dateHeader.setText(label);
-            dateHeader.setTextColor(container == deletedHistoryContainer ? Color.RED : (dateKey.equals(todayKey) ? Color.GREEN : dateColor));
+            dateHeader.setTextColor(container == deletedHistoryContainer ? Color.RED : (Objects.equals(dateKey, todayKey) ? Color.GREEN : dateColor));
             dateHeader.setTextSize(13);
             dateHeader.setPadding(0, 16, 0, 4);
             dateHeader.setOnClickListener(v -> jumpToDate(dateKey, sdf));
@@ -1177,7 +1260,7 @@ public class MainActivity extends AppCompatActivity {
             Calendar cellCal = Calendar.getInstance();
             cellCal.setTime(date);
 
-            dayText.setText(String.valueOf(cellCal.get(Calendar.DAY_OF_MONTH)));
+            dayText.setText(String.format(Locale.getDefault(), "%d", cellCal.get(Calendar.DAY_OF_MONTH)));
 
             SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
             String key = sdf.format(date);
@@ -1201,20 +1284,18 @@ public class MainActivity extends AppCompatActivity {
                 dayText.setTextColor(Color.WHITE);
             }
 
+            dayText.setBackgroundColor(Color.TRANSPARENT);
+            itemView.setBackgroundColor(Color.TRANSPARENT);
+
             Calendar today = Calendar.getInstance();
             if (cellCal.get(Calendar.YEAR) == today.get(Calendar.YEAR) &&
                 cellCal.get(Calendar.MONTH) == today.get(Calendar.MONTH) &&
                 cellCal.get(Calendar.DAY_OF_MONTH) == today.get(Calendar.DAY_OF_MONTH)) {
                 dayText.setBackgroundResource(R.drawable.today_circle);
-                itemView.setBackgroundColor(Color.TRANSPARENT);
             } else if (cellCal.get(Calendar.YEAR) == selectedDate.get(Calendar.YEAR) &&
                 cellCal.get(Calendar.MONTH) == selectedDate.get(Calendar.MONTH) &&
                 cellCal.get(Calendar.DAY_OF_MONTH) == selectedDate.get(Calendar.DAY_OF_MONTH)) {
-                dayText.setBackgroundColor(Color.TRANSPARENT);
                 itemView.setBackgroundColor(Color.parseColor("#33FFFFFF"));
-            } else {
-                dayText.setBackgroundColor(Color.TRANSPARENT);
-                itemView.setBackgroundColor(Color.TRANSPARENT);
             }
 
             itemView.setOnClickListener(v -> {

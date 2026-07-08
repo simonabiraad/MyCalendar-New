@@ -27,4 +27,5 @@
     <string name="deleted_notes_btn">Show Deleted Notes</string>
     <string name="archive_all_past_notes">Archive all past notes</string>
     <string name="clear_trash_btn">Clear All Deleted Notes</string>
+    <string name="notification_icon">🔔</string>
 </resources>
