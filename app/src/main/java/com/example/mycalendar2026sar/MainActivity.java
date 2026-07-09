@@ -396,7 +396,7 @@ public class MainActivity extends AppCompatActivity {
                         SimpleDateFormat icsSdf = new SimpleDateFormat("yyyyMMdd'T'HHmmss", Locale.getDefault());
                         String dateStr = icsSdf.format(cal.getTime());
                         icsContent += "DTSTART:" + dateStr + "\n";
-                        
+
                         cal.add(Calendar.MINUTE, 30);
                         String endDateStr = icsSdf.format(cal.getTime());
                         icsContent += "DTEND:" + endDateStr + "\n";
@@ -445,7 +445,7 @@ public class MainActivity extends AppCompatActivity {
         textView.setText(remarkText);
         textView.setTextColor(Color.WHITE);
         textView.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        
+
         textView.setOnLongClickListener(v -> {
             android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
             String textToCopy = remarkText.startsWith("• ") ? remarkText.substring(2) : remarkText;
@@ -499,7 +499,7 @@ public class MainActivity extends AppCompatActivity {
         List<String> notesList = new ArrayList<>(Arrays.asList(currentNotes.split("\n")));
         if (index >= 0 && index < notesList.size()) {
             String noteToRestore = notesList.remove(index);
-            
+
             // Move back to personal notes (active)
             String savedRemarks = sharedPreferences.getString(dateKey, "");
             String updatedSaved = savedRemarks.isEmpty() ? noteToRestore : savedRemarks + "\n" + noteToRestore;
@@ -512,7 +512,7 @@ public class MainActivity extends AppCompatActivity {
             } else {
                 sourcePrefs.edit().putString(dateKey, updatedSource).apply();
             }
-            
+
             updateRemarkHistory();
             if (Objects.equals(dateKey, currentDateKey)) {
                 loadRemarksForSelectedDate();
@@ -529,7 +529,7 @@ public class MainActivity extends AppCompatActivity {
         List<String> remarksList = new ArrayList<>(Arrays.asList(currentText.split("\n")));
         if (index >= 0 && index < remarksList.size()) {
             String noteToDelete = remarksList.remove(index);
-            
+
             // Move to deleted notes storage
             String currentDeleted = deletedPreferences.getString(dateKey, "");
             String updatedDeleted = currentDeleted.isEmpty() ? noteToDelete : currentDeleted + "\n" + noteToDelete;
@@ -587,7 +587,7 @@ public class MainActivity extends AppCompatActivity {
         List<String> remarksList = new ArrayList<>(Arrays.asList(archivedRemarks.split("\n")));
         if (index >= 0 && index < remarksList.size()) {
             String noteToRestore = remarksList.remove(index);
-            
+
             // Move back to active notes
             String savedRemarks = sharedPreferences.getString(currentDateKey, "");
             String updatedSaved = savedRemarks.isEmpty() ? noteToRestore : savedRemarks + "\n" + noteToRestore;
@@ -600,7 +600,7 @@ public class MainActivity extends AppCompatActivity {
             } else {
                 archivePreferences.edit().putString(currentDateKey, updatedArchived).apply();
             }
-            
+
             loadRemarksForSelectedDate();
             updateRemarkHistory();
             adapter.notifyDataSetChanged();
@@ -674,7 +674,7 @@ public class MainActivity extends AppCompatActivity {
         AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
         Intent intent = new Intent(this, ReminderReceiver.class);
         intent.putExtra("noteText", noteText);
-        
+
         PendingIntent pendingIntent = PendingIntent.getBroadcast(this, requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, reminderTime.getTimeInMillis(), pendingIntent);
@@ -682,7 +682,7 @@ public class MainActivity extends AppCompatActivity {
         SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault());
         String timeValue = sdf.format(reminderTime.getTime());
         reminderPreferences.edit().putString(reminderKey, timeValue).apply();
-        
+
         loadRemarksForSelectedDate();
         Toast.makeText(this, "Reminder set for " + timeValue, Toast.LENGTH_SHORT).show();
     }
@@ -694,7 +694,7 @@ public class MainActivity extends AppCompatActivity {
         AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
         Intent intent = new Intent(this, ReminderReceiver.class);
         PendingIntent pendingIntent = PendingIntent.getBroadcast(this, requestCode, intent, PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE);
-        
+
         if (pendingIntent != null) {
             alarmManager.cancel(pendingIntent);
             pendingIntent.cancel();
@@ -754,7 +754,7 @@ public class MainActivity extends AppCompatActivity {
         List<String> remarksList = new ArrayList<>(Arrays.asList(savedRemarks.split("\n")));
         if (index >= 0 && index < remarksList.size()) {
             String noteToArchive = remarksList.remove(index);
-            
+
             // Move to archive
             String archivedRemarks = archivePreferences.getString(currentDateKey, "");
             String updatedArchived = archivedRemarks.isEmpty() ? noteToArchive : archivedRemarks + "\n" + noteToArchive;
@@ -767,7 +767,7 @@ public class MainActivity extends AppCompatActivity {
             } else {
                 sharedPreferences.edit().putString(currentDateKey, updatedRemarks).apply();
             }
-            
+
             loadRemarksForSelectedDate();
             updateRemarkHistory();
             adapter.notifyDataSetChanged();
@@ -833,14 +833,14 @@ public class MainActivity extends AppCompatActivity {
             lastDeletedDateKey = currentDateKey;
 
             remarksList.remove(index);
-            
+
             // Move to deleted notes storage
             String currentDeleted = deletedPreferences.getString(currentDateKey, "");
             String updatedDeleted = currentDeleted.isEmpty() ? lastDeletedNote : currentDeleted + "\n" + lastDeletedNote;
             deletedPreferences.edit().putString(currentDateKey, updatedDeleted).apply();
 
             String updatedRemarks = String.join("\n", remarksList);
-            
+
             if (updatedRemarks.isEmpty()) {
                 sourcePrefs.edit().remove(currentDateKey).apply();
             } else {
@@ -851,7 +851,7 @@ public class MainActivity extends AppCompatActivity {
             updateRemarkHistory();
             adapter.notifyDataSetChanged();
             deletedHistoryContainer.setVisibility(View.VISIBLE);
-            
+
             showUndoSnackbar();
         }
     }
@@ -914,7 +914,7 @@ public class MainActivity extends AppCompatActivity {
 
         updateRemarkHistory();
         adapter.notifyDataSetChanged();
-        
+
         lastDeletedNote = null;
         lastDeletedDateKey = null;
         Toast.makeText(this, "Restored", Toast.LENGTH_SHORT).show();
@@ -926,9 +926,9 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "Please enter a note", Toast.LENGTH_SHORT).show();
             return;
         }
-        
+
         String entry = "• " + newText;
-        
+
         // Decide which storage to use based on the date
         SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
         String todayKey = sdf.format(Calendar.getInstance().getTime());
@@ -943,9 +943,9 @@ public class MainActivity extends AppCompatActivity {
 
         String existingRemarks = targetPrefs.getString(currentDateKey, "");
         String updatedRemarks = existingRemarks.isEmpty() ? entry : existingRemarks + "\n" + entry;
-        
+
         targetPrefs.edit().putString(currentDateKey, updatedRemarks).apply();
-        
+
         loadRemarksForSelectedDate();
         noteInput.setText("");
         updateRemarkHistory();
@@ -1038,7 +1038,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void archiveAllPastNotes() {
         int movedCount = archiveAllPastNotesSilent();
-        
+
         updateRemarkHistory();
         loadRemarksForSelectedDate();
         adapter.notifyDataSetChanged();
@@ -1063,14 +1063,14 @@ public class MainActivity extends AppCompatActivity {
         Map<String, ?> allEntries = sharedPreferences.getAll();
         SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
         String todayKey = sdf.format(Calendar.getInstance().getTime());
-        
+
         int movedCount = 0;
         for (Map.Entry<String, ?> entry : allEntries.entrySet()) {
             String dateKey = entry.getKey();
             try {
                 Date noteDate = sdf.parse(dateKey);
                 Date todayDate = sdf.parse(todayKey);
-                
+
                 if (noteDate != null && todayDate != null && noteDate.before(todayDate)) {
                     // Move to archive
                     String value = entry.getValue().toString();
@@ -1089,7 +1089,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void loadHistoryFromPrefs(SharedPreferences prefs, LinearLayout container, int emptyTextRes, int dateColor) {
         Map<String, ?> allEntries = prefs.getAll();
-        
+
         if (allEntries.isEmpty()) {
             TextView noHistory = new TextView(this);
             noHistory.setText(getString(emptyTextRes));
@@ -1198,7 +1198,7 @@ public class MainActivity extends AppCompatActivity {
                         delBtn.setOnClickListener(v -> deleteSingleNotePermanently(dateKey, index, prefs));
                     }
                 }
-                
+
                 tv.setOnLongClickListener(v -> {
                     android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
                     android.content.ClipData clip = android.content.ClipData.newPlainText("SAR Note", noteText);
@@ -1301,8 +1301,8 @@ public class MainActivity extends AppCompatActivity {
             itemView.setOnClickListener(v -> {
                 // Set the selected date to whatever cell was clicked
                 selectedDate.set(cellCal.get(Calendar.YEAR), cellCal.get(Calendar.MONTH), cellCal.get(Calendar.DAY_OF_MONTH));
-                
-                // If the user clicked a day from a different month (padding days), 
+
+                // If the user clicked a day from a different month (padding days),
                 // move the calendar to that month automatically.
                 if (cellCal.get(Calendar.MONTH) != currentMonth.get(Calendar.MONTH)) {
                     calendar.set(Calendar.MONTH, cellCal.get(Calendar.MONTH));
