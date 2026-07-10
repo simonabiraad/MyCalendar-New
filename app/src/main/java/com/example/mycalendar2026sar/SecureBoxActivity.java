@@ -26,14 +26,13 @@ import java.util.List;
 
 public class SecureBoxActivity extends AppCompatActivity {
 
-    private LinearLayout personelNotesSection, familyNotesSection, workNotesSection, passwordNotesSection;
-    private GridLayout personelNotesContainer, familyNotesContainer, workNotesContainer, passwordNotesContainer;
-    private EditText personelNoteInput, familyNoteInput, workNoteInput, passwordNoteInput;
+    private LinearLayout personelNotesSection, familyNotesSection, workNotesSection;
+    private GridLayout personelNotesContainer, familyNotesContainer, workNotesContainer;
+    private EditText personelNoteInput, familyNoteInput, workNoteInput;
     private SharedPreferences securePrefs;
     private static final String PERSONEL_KEY = "personel_notes";
     private static final String FAMILY_KEY = "family_notes";
     private static final String WORK_KEY = "work_notes";
-    private static final String PASSWORD_KEY = "password_notes";
     private static final String SEPARATOR = "###NOTE_SEP###";
 
     @Override
@@ -60,24 +59,19 @@ public class SecureBoxActivity extends AppCompatActivity {
         workNotesContainer = findViewById(R.id.workNotesContainer);
         workNoteInput = findViewById(R.id.workNoteInput);
 
-        passwordNotesSection = findViewById(R.id.passwordNotesSection);
-        passwordNotesContainer = findViewById(R.id.passwordNotesContainer);
-        passwordNoteInput = findViewById(R.id.passwordNoteInput);
-
         Button personelButton = findViewById(R.id.personelButton);
         Button familyButton = findViewById(R.id.familyButton);
         Button workButton = findViewById(R.id.workButton);
-        Button passwordButton = findViewById(R.id.passwordButton);
-        
+
         Button savePersonelBtn = findViewById(R.id.savePersonelNoteButton);
         Button saveFamilyBtn = findViewById(R.id.saveFamilyNoteButton);
         Button saveWorkBtn = findViewById(R.id.saveWorkNoteButton);
-        Button savePasswordBtn = findViewById(R.id.savePasswordNoteButton);
 
         securePrefs = getSharedPreferences("SecureBoxNotes", Context.MODE_PRIVATE);
 
         personelButton.setOnClickListener(v -> {
-            hideAllSections();
+            familyNotesSection.setVisibility(View.GONE);
+            workNotesSection.setVisibility(View.GONE);
             if (personelNotesSection.getVisibility() == View.VISIBLE) {
                 personelNotesSection.setVisibility(View.GONE);
             } else {
@@ -87,7 +81,8 @@ public class SecureBoxActivity extends AppCompatActivity {
         });
 
         familyButton.setOnClickListener(v -> {
-            hideAllSections();
+            personelNotesSection.setVisibility(View.GONE);
+            workNotesSection.setVisibility(View.GONE);
             if (familyNotesSection.getVisibility() == View.VISIBLE) {
                 familyNotesSection.setVisibility(View.GONE);
             } else {
@@ -97,7 +92,8 @@ public class SecureBoxActivity extends AppCompatActivity {
         });
 
         workButton.setOnClickListener(v -> {
-            hideAllSections();
+            personelNotesSection.setVisibility(View.GONE);
+            familyNotesSection.setVisibility(View.GONE);
             if (workNotesSection.getVisibility() == View.VISIBLE) {
                 workNotesSection.setVisibility(View.GONE);
             } else {
@@ -106,27 +102,9 @@ public class SecureBoxActivity extends AppCompatActivity {
             }
         });
 
-        passwordButton.setOnClickListener(v -> {
-            hideAllSections();
-            if (passwordNotesSection.getVisibility() == View.VISIBLE) {
-                passwordNotesSection.setVisibility(View.GONE);
-            } else {
-                passwordNotesSection.setVisibility(View.VISIBLE);
-                loadNotes(PASSWORD_KEY, passwordNotesContainer);
-            }
-        });
-
         savePersonelBtn.setOnClickListener(v -> saveNote(PERSONEL_KEY, personelNoteInput, personelNotesContainer));
         saveFamilyBtn.setOnClickListener(v -> saveNote(FAMILY_KEY, familyNoteInput, familyNotesContainer));
         saveWorkBtn.setOnClickListener(v -> saveNote(WORK_KEY, workNoteInput, workNotesContainer));
-        savePasswordBtn.setOnClickListener(v -> saveNote(PASSWORD_KEY, passwordNoteInput, passwordNotesContainer));
-    }
-
-    private void hideAllSections() {
-        personelNotesSection.setVisibility(View.GONE);
-        familyNotesSection.setVisibility(View.GONE);
-        workNotesSection.setVisibility(View.GONE);
-        passwordNotesSection.setVisibility(View.GONE);
     }
 
     private void saveNote(String key, EditText input, GridLayout container) {
@@ -175,9 +153,7 @@ public class SecureBoxActivity extends AppCompatActivity {
                 } else if (key.equals(FAMILY_KEY)) {
                     card.setCardBackgroundColor(getColor(R.color.blue));
                 } else if (key.equals(WORK_KEY)) {
-                    card.setCardBackgroundColor(getColor(R.color.honey));
-                } else if (key.equals(PASSWORD_KEY)) {
-                    card.setCardBackgroundColor(getColor(R.color.unmellow_yellow));
+                    card.setCardBackgroundColor(getColor(R.color.purple_500));
                 }
 
                 noteView.setOnLongClickListener(v -> {

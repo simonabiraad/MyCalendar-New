@@ -12,22 +12,22 @@
         app:cardBackgroundColor="#FFF176"
         app:cardCornerRadius="2dp"
         app:cardElevation="4dp"
-        app:layout_constraintDimensionRatio="1:1"
-        app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintDimensionRatio="1:1"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintTop_toTopOf="parent">
 
         <TextView
             android:id="@+id/noteText"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:padding="12dp"
-            android:textColor="@color/black"
-            android:textSize="14sp"
+            android:ellipsize="end"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
-            android:ellipsize="end" />
+            android:padding="12dp"
+            android:textColor="@color/black"
+            android:textSize="14sp" />
 
     </com.google.android.material.card.MaterialCardView>
 </androidx.constraintlayout.widget.ConstraintLayout>
