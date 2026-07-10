@@ -924,7 +924,7 @@ public class MainActivity extends AppCompatActivity {
         Button archiveBtn = new Button(this);
         archiveBtn.setText(R.string.archive_all_past_notes);
         archiveBtn.setTextSize(12);
-        archiveBtn.setBackgroundTintList(ColorStateList.valueOf(Color.DKGRAY));
+        archiveBtn.setBackgroundTintList(ColorStateList.valueOf(getColor(R.color.light_green)));
         archiveBtn.setTextColor(Color.WHITE);
         archiveBtn.setOnClickListener(v -> archiveAllPastNotes());
         remarkHistoryContainer.addView(archiveBtn);
