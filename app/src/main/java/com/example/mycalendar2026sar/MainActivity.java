@@ -4,6 +4,8 @@ import android.app.AlarmManager;
 import android.app.DatePickerDialog;
 import android.app.PendingIntent;
 import android.app.TimePickerDialog;
+import android.appwidget.AppWidgetManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -41,6 +43,8 @@ import androidx.core.content.FileProvider;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -105,6 +109,7 @@ public class MainActivity extends AppCompatActivity {
         calendarGrid = findViewById(R.id.calendarGrid);
         monthYearText = findViewById(R.id.monthYearText);
         noteInput = findViewById(R.id.noteInput);
+        noteInput.setTextColor(Color.WHITE);
         remarkLabel = findViewById(R.id.remarkLabel);
         dayRemarksContainer = findViewById(R.id.dayRemarksContainer);
         remarkHistoryContainer = findViewById(R.id.remarkHistoryContainer);
@@ -132,10 +137,6 @@ public class MainActivity extends AppCompatActivity {
 
         updateCalendar();
         updateRemarkHistory();
-
-        // Initial state: hide Archive and Deleted containers
-        archiveHistoryContainer.setVisibility(View.GONE);
-        deletedHistoryContainer.setVisibility(View.GONE);
 
         findViewById(R.id.remarkHistoryTitle).setOnClickListener(v -> {
             if (remarkHistoryContainer.getVisibility() == View.VISIBLE) {
@@ -166,6 +167,10 @@ public class MainActivity extends AppCompatActivity {
         
         saveNoteButton.setOnClickListener(v -> saveNote());
 
+        findViewById(R.id.secureBoxButton).setOnClickListener(v -> {
+            Toast.makeText(this, "Secure Box feature coming soon!", Toast.LENGTH_SHORT).show();
+        });
+
         findViewById(R.id.notificationSettingsButton).setOnClickListener(v -> {
             Intent intent = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS);
             intent.putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
@@ -192,27 +197,26 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        
         // Automatically scan and archive past notes every time the user enters the app
         archiveAllPastNotesSilent();
         autoCleanArchive();
         updateRemarkHistory();
+        updateAllWidgets();
     }
 
     private void autoCleanArchive() {
         SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
         Calendar now = Calendar.getInstance();
         
-        // 1 month threshold for Archive -> Delete
         Calendar archiveThresholdCal = (Calendar) now.clone();
         archiveThresholdCal.add(Calendar.MONTH, -1);
         Date archiveThreshold = archiveThresholdCal.getTime();
 
-        // 2 months threshold for Permanent Delete (1 month in Archive + 1 month in Deleted)
         Calendar deleteThresholdCal = (Calendar) now.clone();
         deleteThresholdCal.add(Calendar.MONTH, -2);
         Date deleteThreshold = deleteThresholdCal.getTime();
 
-        // Archive -> Delete
         Map<String, ?> allArchived = archivePreferences.getAll();
         for (Map.Entry<String, ?> entry : allArchived.entrySet()) {
             String dateKey = entry.getKey();
@@ -231,7 +235,6 @@ public class MainActivity extends AppCompatActivity {
             } catch (Exception ignored) {}
         }
 
-        // Permanent Delete from Trash after 1 month in Trash (2 months total age)
         Map<String, ?> allDeleted = deletedPreferences.getAll();
         for (Map.Entry<String, ?> entry : allDeleted.entrySet()) {
             String dateKey = entry.getKey();
@@ -291,7 +294,7 @@ public class MainActivity extends AppCompatActivity {
         } else {
             TextView noRemarks = new TextView(this);
             noRemarks.setText(getString(R.string.no_notes_day));
-            noRemarks.setTextColor(Color.GREEN);
+            noRemarks.setTextColor(Color.WHITE);
             dayRemarksContainer.addView(noRemarks);
         }
     }
@@ -302,7 +305,7 @@ public class MainActivity extends AppCompatActivity {
         horizontalLayout.setGravity(Gravity.CENTER_VERTICAL);
         horizontalLayout.setPadding(0, 4, 0, 4);
 
-        TextView textView = createRemarkTextView(remarkText);
+        TextView textView = createRemarkTextView(remarkText, index, sourcePrefs);
         horizontalLayout.addView(textView);
 
         int iconSize = (int) (23 * getResources().getDisplayMetrics().density);
@@ -311,13 +314,12 @@ public class MainActivity extends AppCompatActivity {
 
         ImageButton alarmButton = createActionButton(android.R.drawable.ic_lock_idle_alarm, btnParams, v -> manageReminder(remarkText));
         
-        // Check if a reminder is set for this specific note
         String reminderKey = currentDateKey + "_" + remarkText;
         boolean hasReminder = reminderPreferences.contains(reminderKey);
         if (hasReminder) {
-            alarmButton.setImageTintList(ColorStateList.valueOf(Color.GREEN));
+            alarmButton.setImageTintList(ColorStateList.valueOf(getColor(R.color.light_green)));
         } else {
-            alarmButton.setImageTintList(null); // Keep original color
+            alarmButton.setImageTintList(null);
         }
         
         horizontalLayout.addView(alarmButton);
@@ -330,10 +332,19 @@ public class MainActivity extends AppCompatActivity {
                     .setTitle("Share Note")
                     .setItems(options, (dialog, which) -> {
                         if (which == 0) {
-                            String noteBody = remarkText.startsWith("• ") ? remarkText.substring(2) : remarkText;
+                            String noteBody = getNoteBody(remarkText);
                             String shareText = "SAR CALENDAR REMINDER:\n" + noteBody + "\nDate: " + currentDateKey;
+                            
+                            String reminderKeyForShare = currentDateKey + "_" + remarkText;
+                            String savedTime = reminderPreferences.getString(reminderKeyForShare, null);
+                            String gCalUrl = getGoogleCalendarUrl(noteBody, currentDateKey, savedTime);
+                            
+                            if (!gCalUrl.isEmpty()) {
+                                shareText += "\n\nAdd to Google Calendar:\n" + gCalUrl;
+                            }
+                            
                             if (hasReminder) {
-                                shareText += "\n(Check SAR Calendar to sync this reminder)";
+                                shareText += "\n\n(Check SAR Calendar to sync this reminder)";
                             }
                             Intent sendIntent = new Intent(Intent.ACTION_SEND);
                             sendIntent.putExtra(Intent.EXTRA_TEXT, shareText);
@@ -355,11 +366,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void shareNoteAsIcs(String noteText, String dateKey) {
-        String noteBody = noteText.startsWith("• ") ? noteText.substring(2) : noteText;
+        String noteBody = getNoteBody(noteText);
         String reminderKey = dateKey + "_" + noteText;
         String savedTime = reminderPreferences.getString(reminderKey, null);
 
-        // Prepare ICS content
         String icsContent = "BEGIN:VCALENDAR\n" +
                 "VERSION:2.0\n" +
                 "PRODID:-//SAR Calendar//EN\n" +
@@ -381,7 +391,6 @@ public class MainActivity extends AppCompatActivity {
                             parsed = true;
                         }
                     } catch (Exception e) {
-                        // Fallback for old HH:mm format
                         if (savedTime.contains(":")) {
                             String[] parts = savedTime.split(":");
                             cal.setTime(date);
@@ -396,7 +405,6 @@ public class MainActivity extends AppCompatActivity {
                         SimpleDateFormat icsSdf = new SimpleDateFormat("yyyyMMdd'T'HHmmss", Locale.getDefault());
                         String dateStr = icsSdf.format(cal.getTime());
                         icsContent += "DTSTART:" + dateStr + "\n";
-
                         cal.add(Calendar.MINUTE, 30);
                         String endDateStr = icsSdf.format(cal.getTime());
                         icsContent += "DTEND:" + endDateStr + "\n";
@@ -409,46 +417,109 @@ public class MainActivity extends AppCompatActivity {
             }
         } catch (Exception ignored) {}
         
-        icsContent += "DESCRIPTION:SAR Calendar Note\n" +
+        icsContent += "DESCRIPTION:SAR Calendar Note\\n\\nAdd to Google Calendar:\\n" + getGoogleCalendarUrl(noteBody, dateKey, savedTime) + "\n" +
                 "END:VEVENT\n" +
                 "END:VCALENDAR";
 
         try {
-            // Create temporary file
             File cachePath = new File(getCacheDir(), "shared_notes");
-            if (!cachePath.exists() && !cachePath.mkdirs()) {
-                Toast.makeText(this, "Failed to create directory", Toast.LENGTH_SHORT).show();
-                return;
-            }
+            if (!cachePath.exists() && !cachePath.mkdirs()) return;
             File icsFile = new File(cachePath, "note_reminder.ics");
             FileOutputStream stream = new FileOutputStream(icsFile);
             stream.write(icsContent.getBytes());
             stream.close();
 
-            // Get URI using FileProvider
             android.net.Uri contentUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", icsFile);
-
-            // Create share intent
             Intent intent = new Intent(Intent.ACTION_SEND);
             intent.setType("text/calendar");
             intent.putExtra(Intent.EXTRA_STREAM, contentUri);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             startActivity(Intent.createChooser(intent, "Share Note via"));
-
         } catch (Exception e) {
             Toast.makeText(this, "Error creating .ics file", Toast.LENGTH_SHORT).show();
         }
     }
 
-    private TextView createRemarkTextView(String remarkText) {
+    private String getGoogleCalendarUrl(String title, String dateKey, String savedTime) {
+        String baseUrl = "https://www.google.com/calendar/render?action=TEMPLATE";
+        try {
+            String encodedTitle = URLEncoder.encode(title, StandardCharsets.UTF_8.name());
+            String dates = "";
+            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
+            Date date = sdf.parse(dateKey);
+            if (date != null) {
+                Calendar cal = Calendar.getInstance();
+                cal.setTime(date);
+                if (savedTime != null) {
+                    SimpleDateFormat reminderSdf = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault());
+                    try {
+                        Date fullDate = reminderSdf.parse(savedTime);
+                        if (fullDate != null) cal.setTime(fullDate);
+                    } catch (Exception e) {
+                        if (savedTime.contains(":")) {
+                            String[] parts = savedTime.split(":");
+                            cal.set(Calendar.HOUR_OF_DAY, Integer.parseInt(parts[0]));
+                            cal.set(Calendar.MINUTE, Integer.parseInt(parts[1]));
+                        }
+                    }
+                    SimpleDateFormat urlSdf = new SimpleDateFormat("yyyyMMdd'T'HHmmss", Locale.getDefault());
+                    String start = urlSdf.format(cal.getTime());
+                    cal.add(Calendar.MINUTE, 30);
+                    String end = urlSdf.format(cal.getTime());
+                    dates = start + "/" + end;
+                } else {
+                    SimpleDateFormat urlSdf = new SimpleDateFormat("yyyyMMdd", Locale.getDefault());
+                    String start = urlSdf.format(cal.getTime());
+                    cal.add(Calendar.DAY_OF_MONTH, 1);
+                    String end = urlSdf.format(cal.getTime());
+                    dates = start + "/" + end;
+                }
+            }
+            return baseUrl + "&text=" + encodedTitle + "&dates=" + dates + "&details=Created+via+SAR+Calendar";
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private String getNoteBody(String text) {
+        if (text.startsWith("• ") || text.startsWith("□ ") || text.startsWith("▣ ")) {
+            return text.substring(2);
+        }
+        return text;
+    }
+
+    private void toggleNoteFinished(int index, SharedPreferences sourcePrefs) {
+        String currentText = sourcePrefs.getString(currentDateKey, "");
+        if (currentText.isEmpty()) return;
+
+        List<String> remarksList = new ArrayList<>(Arrays.asList(currentText.split("\n")));
+        if (index >= 0 && index < remarksList.size()) {
+            String note = remarksList.get(index);
+            if (note.startsWith("□ ")) {
+                remarksList.set(index, "▣ " + note.substring(2));
+            } else {
+                remarksList.set(index, "□ " + getNoteBody(note));
+            }
+
+            String updatedRemarks = String.join("\n", remarksList);
+            sourcePrefs.edit().putString(currentDateKey, updatedRemarks).apply();
+            loadRemarksForSelectedDate();
+            updateRemarkHistory();
+            updateAllWidgets();
+        }
+    }
+
+    private TextView createRemarkTextView(String remarkText, int index, SharedPreferences sourcePrefs) {
         TextView textView = new TextView(this);
         textView.setText(remarkText);
         textView.setTextColor(Color.WHITE);
         textView.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
+        textView.setOnClickListener(v -> toggleNoteFinished(index, sourcePrefs));
+
         textView.setOnLongClickListener(v -> {
             android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-            String textToCopy = remarkText.startsWith("• ") ? remarkText.substring(2) : remarkText;
+            String textToCopy = getNoteBody(remarkText);
             android.content.ClipData clip = android.content.ClipData.newPlainText("SAR Note", textToCopy);
             clipboard.setPrimaryClip(clip);
             Toast.makeText(this, "Note copied to clipboard", Toast.LENGTH_SHORT).show();
@@ -474,7 +545,6 @@ public class MainActivity extends AppCompatActivity {
         archiveButton.setLayoutParams(params);
         archiveButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
         archiveButton.setPadding(4, 4, 4, 4);
-
         if (sourcePrefs == archivePreferences) {
             archiveButton.setImageResource(android.R.drawable.ic_menu_revert);
             archiveButton.setOnClickListener(v -> unarchiveNote(index));
@@ -495,29 +565,19 @@ public class MainActivity extends AppCompatActivity {
     private void restoreSingleNote(String dateKey, int index, SharedPreferences sourcePrefs) {
         String currentNotes = sourcePrefs.getString(dateKey, "");
         if (currentNotes.isEmpty()) return;
-
         List<String> notesList = new ArrayList<>(Arrays.asList(currentNotes.split("\n")));
         if (index >= 0 && index < notesList.size()) {
             String noteToRestore = notesList.remove(index);
-
-            // Move back to personal notes (active)
             String savedRemarks = sharedPreferences.getString(dateKey, "");
             String updatedSaved = savedRemarks.isEmpty() ? noteToRestore : savedRemarks + "\n" + noteToRestore;
             sharedPreferences.edit().putString(dateKey, updatedSaved).apply();
-
-            // Update source
             String updatedSource = String.join("\n", notesList);
-            if (updatedSource.isEmpty()) {
-                sourcePrefs.edit().remove(dateKey).apply();
-            } else {
-                sourcePrefs.edit().putString(dateKey, updatedSource).apply();
-            }
-
+            if (updatedSource.isEmpty()) sourcePrefs.edit().remove(dateKey).apply();
+            else sourcePrefs.edit().putString(dateKey, updatedSource).apply();
             updateRemarkHistory();
-            if (Objects.equals(dateKey, currentDateKey)) {
-                loadRemarksForSelectedDate();
-            }
+            if (Objects.equals(dateKey, currentDateKey)) loadRemarksForSelectedDate();
             adapter.notifyDataSetChanged();
+            updateAllWidgets();
             Toast.makeText(this, "Note restored to personal notes", Toast.LENGTH_SHORT).show();
         }
     }
@@ -525,29 +585,20 @@ public class MainActivity extends AppCompatActivity {
     private void deleteSingleNote(String dateKey, int index, SharedPreferences sourcePrefs) {
         String currentText = sourcePrefs.getString(dateKey, "");
         if (currentText.isEmpty()) return;
-
         List<String> remarksList = new ArrayList<>(Arrays.asList(currentText.split("\n")));
         if (index >= 0 && index < remarksList.size()) {
             String noteToDelete = remarksList.remove(index);
-
-            // Move to deleted notes storage
             String currentDeleted = deletedPreferences.getString(dateKey, "");
             String updatedDeleted = currentDeleted.isEmpty() ? noteToDelete : currentDeleted + "\n" + noteToDelete;
             deletedPreferences.edit().putString(dateKey, updatedDeleted).apply();
-
             String updatedRemarks = String.join("\n", remarksList);
-            if (updatedRemarks.isEmpty()) {
-                sourcePrefs.edit().remove(dateKey).apply();
-            } else {
-                sourcePrefs.edit().putString(dateKey, updatedRemarks).apply();
-            }
-
+            if (updatedRemarks.isEmpty()) sourcePrefs.edit().remove(dateKey).apply();
+            else sourcePrefs.edit().putString(dateKey, updatedRemarks).apply();
             updateRemarkHistory();
-            if (Objects.equals(dateKey, currentDateKey)) {
-                loadRemarksForSelectedDate();
-            }
+            if (Objects.equals(dateKey, currentDateKey)) loadRemarksForSelectedDate();
             adapter.notifyDataSetChanged();
             deletedHistoryContainer.setVisibility(View.VISIBLE);
+            updateAllWidgets();
             Toast.makeText(this, "Note moved to trash", Toast.LENGTH_SHORT).show();
         }
     }
@@ -563,47 +614,34 @@ public class MainActivity extends AppCompatActivity {
                     if (index >= 0 && index < notesList.size()) {
                         notesList.remove(index);
                         String updatedSource = String.join("\n", notesList);
-                        if (updatedSource.isEmpty()) {
-                            sourcePrefs.edit().remove(dateKey).apply();
-                        } else {
-                            sourcePrefs.edit().putString(dateKey, updatedSource).apply();
-                        }
+                        if (updatedSource.isEmpty()) sourcePrefs.edit().remove(dateKey).apply();
+                        else sourcePrefs.edit().putString(dateKey, updatedSource).apply();
                         updateRemarkHistory();
-                        if (dateKey.equals(currentDateKey)) {
-                            loadRemarksForSelectedDate();
-                        }
+                        if (Objects.equals(dateKey, currentDateKey)) loadRemarksForSelectedDate();
                         adapter.notifyDataSetChanged();
+                        updateAllWidgets();
                         Toast.makeText(this, "Permanently Deleted", Toast.LENGTH_SHORT).show();
                     }
                 })
-                .setNegativeButton("No", null)
-                .show();
+                .setNegativeButton("No", null).show();
     }
 
     private void unarchiveNote(int index) {
         String archivedRemarks = archivePreferences.getString(currentDateKey, "");
         if (archivedRemarks.isEmpty()) return;
-
         List<String> remarksList = new ArrayList<>(Arrays.asList(archivedRemarks.split("\n")));
         if (index >= 0 && index < remarksList.size()) {
             String noteToRestore = remarksList.remove(index);
-
-            // Move back to active notes
             String savedRemarks = sharedPreferences.getString(currentDateKey, "");
             String updatedSaved = savedRemarks.isEmpty() ? noteToRestore : savedRemarks + "\n" + noteToRestore;
             sharedPreferences.edit().putString(currentDateKey, updatedSaved).apply();
-
-            // Update archive
             String updatedArchived = String.join("\n", remarksList);
-            if (updatedArchived.isEmpty()) {
-                archivePreferences.edit().remove(currentDateKey).apply();
-            } else {
-                archivePreferences.edit().putString(currentDateKey, updatedArchived).apply();
-            }
-
+            if (updatedArchived.isEmpty()) archivePreferences.edit().remove(currentDateKey).apply();
+            else archivePreferences.edit().putString(currentDateKey, updatedArchived).apply();
             loadRemarksForSelectedDate();
             updateRemarkHistory();
             adapter.notifyDataSetChanged();
+            updateAllWidgets();
             Toast.makeText(this, "Note restored from archive", Toast.LENGTH_SHORT).show();
         }
     }
@@ -618,15 +656,13 @@ public class MainActivity extends AppCompatActivity {
     private void manageReminder(String noteText) {
         String reminderKey = currentDateKey + "_" + noteText;
         String savedValue = reminderPreferences.getString(reminderKey, null);
-
         if (savedValue != null) {
             new AlertDialog.Builder(this)
                     .setTitle("Manage Reminder")
                     .setMessage("Currently set for: " + savedValue)
                     .setPositiveButton("Edit", (dialog, which) -> showReminderPicker(noteText))
                     .setNegativeButton("Delete", (dialog, which) -> deleteReminder(noteText))
-                    .setNeutralButton("Cancel", null)
-                    .show();
+                    .setNeutralButton("Cancel", null).show();
         } else {
             showReminderPicker(noteText);
         }
@@ -647,18 +683,15 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         } catch (Exception ignored) {}
-
         new DatePickerDialog(this, (view, year, month, day) -> {
             Calendar pickedDate = Calendar.getInstance();
             pickedDate.set(year, month, day);
-
             new TimePickerDialog(this, (v, hour, minute) -> {
                 pickedDate.set(Calendar.HOUR_OF_DAY, hour);
                 pickedDate.set(Calendar.MINUTE, minute);
                 pickedDate.set(Calendar.SECOND, 0);
                 setReminder(pickedDate, noteText);
             }, current.get(Calendar.HOUR_OF_DAY), current.get(Calendar.MINUTE), true).show();
-
         }, current.get(Calendar.YEAR), current.get(Calendar.MONTH), current.get(Calendar.DAY_OF_MONTH)).show();
     }
 
@@ -667,22 +700,16 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "Cannot set reminder in the past!", Toast.LENGTH_SHORT).show();
             return;
         }
-
         String reminderKey = currentDateKey + "_" + noteText;
         int requestCode = reminderKey.hashCode();
-
         AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
         Intent intent = new Intent(this, ReminderReceiver.class);
         intent.putExtra("noteText", noteText);
-
         PendingIntent pendingIntent = PendingIntent.getBroadcast(this, requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
         alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, reminderTime.getTimeInMillis(), pendingIntent);
-
         SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault());
         String timeValue = sdf.format(reminderTime.getTime());
         reminderPreferences.edit().putString(reminderKey, timeValue).apply();
-
         loadRemarksForSelectedDate();
         Toast.makeText(this, "Reminder set for " + timeValue, Toast.LENGTH_SHORT).show();
     }
@@ -690,16 +717,13 @@ public class MainActivity extends AppCompatActivity {
     private void deleteReminder(String noteText) {
         String reminderKey = currentDateKey + "_" + noteText;
         int requestCode = reminderKey.hashCode();
-
         AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
         Intent intent = new Intent(this, ReminderReceiver.class);
         PendingIntent pendingIntent = PendingIntent.getBroadcast(this, requestCode, intent, PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE);
-
         if (pendingIntent != null) {
             alarmManager.cancel(pendingIntent);
             pendingIntent.cancel();
         }
-
         reminderPreferences.edit().remove(reminderKey).apply();
         loadRemarksForSelectedDate();
         Toast.makeText(this, "Reminder deleted", Toast.LENGTH_SHORT).show();
@@ -708,115 +732,85 @@ public class MainActivity extends AppCompatActivity {
     private void showEditDialog(String currentText, int index, SharedPreferences sourcePrefs) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Edit Note");
-
         final EditText input = new EditText(this);
-        input.setText(currentText.startsWith("• ") ? currentText.substring(2) : currentText);
+        input.setTextColor(Color.WHITE);
+        input.setText(getNoteBody(currentText));
         builder.setView(input);
-
         builder.setPositiveButton("Save", (dialog, which) -> {
             String updatedText = input.getText().toString().trim();
-            if (!updatedText.isEmpty()) {
-                updateRemark(updatedText, index, sourcePrefs);
-            }
+            if (!updatedText.isEmpty()) updateRemark(updatedText, index, sourcePrefs);
         });
-        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
-
-        builder.show();
+        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel()).show();
     }
 
     private void updateRemark(String newText, int index, SharedPreferences sourcePrefs) {
         String currentText = sourcePrefs.getString(currentDateKey, "");
         if (currentText.isEmpty()) return;
-
         List<String> remarksList = new ArrayList<>(Arrays.asList(currentText.split("\n")));
         if (index >= 0 && index < remarksList.size()) {
-            remarksList.set(index, "• " + newText);
+            remarksList.set(index, "□ " + newText);
             String updatedRemarks = String.join("\n", remarksList);
             sourcePrefs.edit().putString(currentDateKey, updatedRemarks).apply();
             loadRemarksForSelectedDate();
             updateRemarkHistory();
+            updateAllWidgets();
         }
     }
 
     private void archiveNote(int index) {
-        new AlertDialog.Builder(this)
-                .setTitle("Archive Note")
-                .setMessage("Are you sure you want to archive this note?")
+        new AlertDialog.Builder(this).setTitle("Archive Note").setMessage("Are you sure you want to archive this note?")
                 .setPositiveButton("Yes", (dialog, which) -> performArchiveNote(index))
-                .setNegativeButton("No", null)
-                .show();
+                .setNegativeButton("No", null).show();
     }
 
     private void performArchiveNote(int index) {
         String savedRemarks = sharedPreferences.getString(currentDateKey, "");
         if (savedRemarks.isEmpty()) return;
-
         List<String> remarksList = new ArrayList<>(Arrays.asList(savedRemarks.split("\n")));
         if (index >= 0 && index < remarksList.size()) {
             String noteToArchive = remarksList.remove(index);
-
-            // Move to archive
             String archivedRemarks = archivePreferences.getString(currentDateKey, "");
             String updatedArchived = archivedRemarks.isEmpty() ? noteToArchive : archivedRemarks + "\n" + noteToArchive;
             archivePreferences.edit().putString(currentDateKey, updatedArchived).apply();
-
-            // Update original
             String updatedRemarks = String.join("\n", remarksList);
-            if (updatedRemarks.isEmpty()) {
-                sharedPreferences.edit().remove(currentDateKey).apply();
-            } else {
-                sharedPreferences.edit().putString(currentDateKey, updatedRemarks).apply();
-            }
-
+            if (updatedRemarks.isEmpty()) sharedPreferences.edit().remove(currentDateKey).apply();
+            else sharedPreferences.edit().putString(currentDateKey, updatedRemarks).apply();
             loadRemarksForSelectedDate();
             updateRemarkHistory();
             adapter.notifyDataSetChanged();
             archiveHistoryContainer.setVisibility(View.VISIBLE);
+            updateAllWidgets();
             Toast.makeText(this, R.string.archive_success, Toast.LENGTH_SHORT).show();
         }
     }
 
     private void deleteRemark(int index, SharedPreferences sourcePrefs) {
         if (sourcePrefs == deletedPreferences) {
-            new AlertDialog.Builder(this)
-                    .setTitle("Delete Note")
-                    .setMessage("Permanently delete this note?")
+            new AlertDialog.Builder(this).setTitle("Delete Note").setMessage("Permanently delete this note?")
                     .setPositiveButton("Yes", (dialog, which) -> performPermanentDelete(index, sourcePrefs))
-                    .setNegativeButton("No", null)
-                    .show();
+                    .setNegativeButton("No", null).show();
             return;
         }
-
         String[] options = {"Move to Trash", "Delete Permanently"};
-        new AlertDialog.Builder(this)
-                .setTitle("Delete Note")
-                .setItems(options, (dialog, which) -> {
-                    if (which == 0) {
-                        performDeleteRemark(index, sourcePrefs);
-                    } else {
-                        performPermanentDelete(index, sourcePrefs);
-                    }
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+        new AlertDialog.Builder(this).setTitle("Delete Note").setItems(options, (dialog, which) -> {
+            if (which == 0) performDeleteRemark(index, sourcePrefs);
+            else performPermanentDelete(index, sourcePrefs);
+        }).setNegativeButton("Cancel", null).show();
     }
 
     private void performPermanentDelete(int index, SharedPreferences sourcePrefs) {
         String currentText = sourcePrefs.getString(currentDateKey, "");
         if (currentText.isEmpty()) return;
-
         List<String> remarksList = new ArrayList<>(Arrays.asList(currentText.split("\n")));
         if (index >= 0 && index < remarksList.size()) {
             remarksList.remove(index);
             String updatedRemarks = String.join("\n", remarksList);
-            if (updatedRemarks.isEmpty()) {
-                sourcePrefs.edit().remove(currentDateKey).apply();
-            } else {
-                sourcePrefs.edit().putString(currentDateKey, updatedRemarks).apply();
-            }
+            if (updatedRemarks.isEmpty()) sourcePrefs.edit().remove(currentDateKey).apply();
+            else sourcePrefs.edit().putString(currentDateKey, updatedRemarks).apply();
             loadRemarksForSelectedDate();
             updateRemarkHistory();
             adapter.notifyDataSetChanged();
+            updateAllWidgets();
             Toast.makeText(this, "Permanently Deleted", Toast.LENGTH_SHORT).show();
         }
     }
@@ -824,97 +818,61 @@ public class MainActivity extends AppCompatActivity {
     private void performDeleteRemark(int index, SharedPreferences sourcePrefs) {
         String currentText = sourcePrefs.getString(currentDateKey, "");
         if (currentText.isEmpty()) return;
-
         List<String> remarksList = new ArrayList<>(Arrays.asList(currentText.split("\n")));
         if (index >= 0 && index < remarksList.size()) {
-            // Save for undo
             lastDeletedNote = remarksList.get(index);
             lastDeletedIndex = index;
             lastDeletedDateKey = currentDateKey;
-
             remarksList.remove(index);
-
-            // Move to deleted notes storage
             String currentDeleted = deletedPreferences.getString(currentDateKey, "");
             String updatedDeleted = currentDeleted.isEmpty() ? lastDeletedNote : currentDeleted + "\n" + lastDeletedNote;
             deletedPreferences.edit().putString(currentDateKey, updatedDeleted).apply();
-
             String updatedRemarks = String.join("\n", remarksList);
-
-            if (updatedRemarks.isEmpty()) {
-                sourcePrefs.edit().remove(currentDateKey).apply();
-            } else {
-                sourcePrefs.edit().putString(currentDateKey, updatedRemarks).apply();
-            }
-
+            if (updatedRemarks.isEmpty()) sourcePrefs.edit().remove(currentDateKey).apply();
+            else sourcePrefs.edit().putString(currentDateKey, updatedRemarks).apply();
             loadRemarksForSelectedDate();
             updateRemarkHistory();
             adapter.notifyDataSetChanged();
             deletedHistoryContainer.setVisibility(View.VISIBLE);
-
             showUndoSnackbar();
+            updateAllWidgets();
         }
     }
 
     private void showUndoSnackbar() {
-        View rootView = findViewById(R.id.main);
-        Snackbar snackbar = Snackbar.make(rootView, "Note deleted", Snackbar.LENGTH_LONG);
-        snackbar.setAction("UNDO", v -> undoDelete());
-        snackbar.setActionTextColor(Color.YELLOW);
-        snackbar.show();
+        Snackbar.make(findViewById(R.id.main), "Note moved to trash", Snackbar.LENGTH_LONG)
+                .setAction("UNDO", v -> undoDelete())
+                .show();
     }
 
     private void undoDelete() {
         if (lastDeletedNote == null || lastDeletedDateKey == null) return;
-
-        // Find correct storage for restoration based on date
         SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
         String todayKey = sdf.format(Calendar.getInstance().getTime());
         SharedPreferences targetPrefs = sharedPreferences;
         try {
             Date noteDate = sdf.parse(lastDeletedDateKey);
             Date today = sdf.parse(todayKey);
-            if (noteDate != null && today != null && noteDate.before(today)) {
-                targetPrefs = archivePreferences;
-            }
+            if (noteDate != null && today != null && noteDate.before(today)) targetPrefs = archivePreferences;
         } catch (Exception ignored) {}
-
         String currentRemarks = targetPrefs.getString(lastDeletedDateKey, "");
         List<String> remarksList = new ArrayList<>();
-        if (!currentRemarks.isEmpty()) {
-            remarksList.addAll(Arrays.asList(currentRemarks.split("\n")));
-        }
-
-        // Put it back at its original index if possible, or at the end
-        if (lastDeletedIndex >= 0 && lastDeletedIndex <= remarksList.size()) {
-            remarksList.add(lastDeletedIndex, lastDeletedNote);
-        } else {
-            remarksList.add(lastDeletedNote);
-        }
-
+        if (!currentRemarks.isEmpty()) remarksList.addAll(Arrays.asList(currentRemarks.split("\n")));
+        if (lastDeletedIndex >= 0 && lastDeletedIndex <= remarksList.size()) remarksList.add(lastDeletedIndex, lastDeletedNote);
+        else remarksList.add(lastDeletedNote);
         String updatedRemarks = String.join("\n", remarksList);
         targetPrefs.edit().putString(lastDeletedDateKey, updatedRemarks).apply();
-
-        // If we are still on the same date, refresh the view
-        if (Objects.equals(lastDeletedDateKey, currentDateKey)) {
-            loadRemarksForSelectedDate();
-        }
-
-        // Remove from deleted notes storage
+        if (Objects.equals(lastDeletedDateKey, currentDateKey)) loadRemarksForSelectedDate();
         String currentDeleted = deletedPreferences.getString(lastDeletedDateKey, "");
         if (!currentDeleted.isEmpty()) {
             List<String> deletedList = new ArrayList<>(Arrays.asList(currentDeleted.split("\n")));
             deletedList.remove(lastDeletedNote);
-            if (deletedList.isEmpty()) {
-                deletedPreferences.edit().remove(lastDeletedDateKey).apply();
-            } else {
-                deletedPreferences.edit().putString(lastDeletedDateKey, String.join("\n", deletedList)).apply();
-            }
+            if (deletedList.isEmpty()) deletedPreferences.edit().remove(lastDeletedDateKey).apply();
+            else deletedPreferences.edit().putString(lastDeletedDateKey, String.join("\n", deletedList)).apply();
         }
-
         updateRemarkHistory();
         adapter.notifyDataSetChanged();
-
+        updateAllWidgets();
         lastDeletedNote = null;
         lastDeletedDateKey = null;
         Toast.makeText(this, "Restored", Toast.LENGTH_SHORT).show();
@@ -926,30 +884,23 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "Please enter a note", Toast.LENGTH_SHORT).show();
             return;
         }
-
-        String entry = "• " + newText;
-
-        // Decide which storage to use based on the date
+        String entry = "□ " + newText;
         SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
         String todayKey = sdf.format(Calendar.getInstance().getTime());
         SharedPreferences targetPrefs = sharedPreferences;
         try {
             Date selected = sdf.parse(currentDateKey);
             Date today = sdf.parse(todayKey);
-            if (selected != null && today != null && selected.before(today)) {
-                targetPrefs = archivePreferences;
-            }
+            if (selected != null && today != null && selected.before(today)) targetPrefs = archivePreferences;
         } catch (Exception ignored) {}
-
         String existingRemarks = targetPrefs.getString(currentDateKey, "");
         String updatedRemarks = existingRemarks.isEmpty() ? entry : existingRemarks + "\n" + entry;
-
         targetPrefs.edit().putString(currentDateKey, updatedRemarks).apply();
-
         loadRemarksForSelectedDate();
         noteInput.setText("");
         updateRemarkHistory();
         adapter.notifyDataSetChanged();
+        updateAllWidgets();
         Toast.makeText(this, "Note added!", Toast.LENGTH_SHORT).show();
     }
 
@@ -957,20 +908,14 @@ public class MainActivity extends AppCompatActivity {
         remarkHistoryContainer.removeAllViews();
         archiveHistoryContainer.removeAllViews();
         deletedHistoryContainer.removeAllViews();
-
-        // Count active notes (Today & Future)
         int activeCount = countTotalNotes(sharedPreferences);
         TextView activeTitle = findViewById(R.id.remarkHistoryTitle);
         if (activeTitle != null) {
             String countText = getString(R.string.all_personal_notes) + " (" + activeCount + ")";
             activeTitle.setText(countText);
-            activeTitle.setTextColor(Color.GREEN);
+            activeTitle.setTextColor(getColor(R.color.light_green));
         }
-
-        // Show active personal notes (Today & Future)
-        loadHistoryFromPrefs(sharedPreferences, remarkHistoryContainer, R.string.no_notes_saved, Color.GREEN);
-
-        // Archive Button
+        loadHistoryFromPrefs(sharedPreferences, remarkHistoryContainer, R.string.no_notes_saved, getColor(R.color.light_green));
         Button archiveBtn = new Button(this);
         archiveBtn.setText(R.string.archive_all_past_notes);
         archiveBtn.setTextSize(12);
@@ -978,8 +923,6 @@ public class MainActivity extends AppCompatActivity {
         archiveBtn.setTextColor(Color.WHITE);
         archiveBtn.setOnClickListener(v -> archiveAllPastNotes());
         remarkHistoryContainer.addView(archiveBtn);
-
-        // Count archived notes
         int archiveCount = countTotalNotes(archivePreferences);
         TextView archiveTitle = findViewById(R.id.archiveHistoryTitle);
         if (archiveTitle != null) {
@@ -987,11 +930,7 @@ public class MainActivity extends AppCompatActivity {
             archiveTitle.setText(countText);
             archiveTitle.setTextColor(Color.YELLOW);
         }
-
-        // Show archived notes
         loadHistoryFromPrefs(archivePreferences, archiveHistoryContainer, R.string.no_archived_notes, Color.YELLOW);
-
-        // Count deleted notes
         int deletedCount = countTotalNotes(deletedPreferences);
         TextView deletedTitle = findViewById(R.id.deletedHistoryTitle);
         if (deletedTitle != null) {
@@ -999,11 +938,7 @@ public class MainActivity extends AppCompatActivity {
             deletedTitle.setText(countText);
             deletedTitle.setTextColor(Color.RED);
         }
-
-        // Show deleted notes in RED
         loadHistoryFromPrefs(deletedPreferences, deletedHistoryContainer, R.string.no_deleted_notes, Color.RED);
-
-        // Add "Clear All Deleted Notes" button
         Button clearTrashBtn = new Button(this);
         clearTrashBtn.setText(R.string.clear_trash_btn);
         clearTrashBtn.setTextSize(10);
@@ -1011,14 +946,12 @@ public class MainActivity extends AppCompatActivity {
         clearTrashBtn.setTextColor(Color.WHITE);
         clearTrashBtn.setOnClickListener(v -> new AlertDialog.Builder(MainActivity.this)
                 .setTitle("Clear Trash")
-                .setMessage("Permanently delete all notes in trash?")
-                .setPositiveButton("Yes", (dialog, which) -> {
+                .setMessage("Permanently delete all notes in trash?").setPositiveButton("Yes", (dialog, which) -> {
                     deletedPreferences.edit().clear().apply();
                     updateRemarkHistory();
+                    updateAllWidgets();
                     Toast.makeText(MainActivity.this, "Trash cleared", Toast.LENGTH_SHORT).show();
-                })
-                .setNegativeButton("No", null)
-                .show());
+                }).setNegativeButton("No", null).show());
         deletedHistoryContainer.addView(clearTrashBtn);
     }
 
@@ -1028,9 +961,7 @@ public class MainActivity extends AppCompatActivity {
         for (Object entry : allEntries.values()) {
             if (entry != null) {
                 String val = entry.toString();
-                if (!val.isEmpty()) {
-                    count += val.split("\n").length;
-                }
+                if (!val.isEmpty()) count += val.split("\n").length;
             }
         }
         return count;
@@ -1038,24 +969,17 @@ public class MainActivity extends AppCompatActivity {
 
     private void archiveAllPastNotes() {
         int movedCount = archiveAllPastNotesSilent();
-
         updateRemarkHistory();
         loadRemarksForSelectedDate();
         adapter.notifyDataSetChanged();
-
+        updateAllWidgets();
         if (movedCount > 0) {
             archiveHistoryContainer.setVisibility(View.VISIBLE);
             Toast.makeText(this, movedCount + " dates moved to archive", Toast.LENGTH_SHORT).show();
-        } else {
-            Toast.makeText(this, "No old notes to archive", Toast.LENGTH_SHORT).show();
-        }
-
-        // Scroll to the Archive Folder section
+        } else Toast.makeText(this, "No old notes to archive", Toast.LENGTH_SHORT).show();
         mainScrollView.post(() -> {
             View title = findViewById(R.id.archiveHistoryTitle);
-            if (title != null) {
-                mainScrollView.smoothScrollTo(0, title.getTop());
-            }
+            if (title != null) mainScrollView.smoothScrollTo(0, title.getTop());
         });
     }
 
@@ -1063,16 +987,13 @@ public class MainActivity extends AppCompatActivity {
         Map<String, ?> allEntries = sharedPreferences.getAll();
         SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
         String todayKey = sdf.format(Calendar.getInstance().getTime());
-
         int movedCount = 0;
         for (Map.Entry<String, ?> entry : allEntries.entrySet()) {
             String dateKey = entry.getKey();
             try {
                 Date noteDate = sdf.parse(dateKey);
                 Date todayDate = sdf.parse(todayKey);
-
                 if (noteDate != null && todayDate != null && noteDate.before(todayDate)) {
-                    // Move to archive
                     String value = entry.getValue().toString();
                     if (!value.isEmpty()) {
                         String existingArchived = archivePreferences.getString(dateKey, "");
@@ -1089,7 +1010,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void loadHistoryFromPrefs(SharedPreferences prefs, LinearLayout container, int emptyTextRes, int dateColor) {
         Map<String, ?> allEntries = prefs.getAll();
-
         if (allEntries.isEmpty()) {
             TextView noHistory = new TextView(this);
             noHistory.setText(getString(emptyTextRes));
@@ -1097,11 +1017,9 @@ public class MainActivity extends AppCompatActivity {
             container.addView(noHistory);
             return;
         }
-
         List<String> sortedKeys = new ArrayList<>(allEntries.keySet());
         SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
         String todayKey = sdf.format(Calendar.getInstance().getTime());
-
         sortedKeys.sort((o1, o2) -> {
             try {
                 Date d1 = sdf.parse(o1);
@@ -1110,42 +1028,33 @@ public class MainActivity extends AppCompatActivity {
             } catch (Exception ignored) {}
             return o1.compareTo(o2);
         });
-
         for (String dateKey : sortedKeys) {
             Object valObj = allEntries.get(dateKey);
             String value = valObj != null ? valObj.toString() : "";
             if (value.isEmpty()) continue;
             String[] notes = value.split("\n");
-
-            // Date Header
             TextView dateHeader = new TextView(this);
             String label = Objects.equals(dateKey, todayKey) ? "TODAY: " + dateKey : "Date: " + dateKey;
             dateHeader.setText(label);
-            dateHeader.setTextColor(container == deletedHistoryContainer ? Color.RED : (Objects.equals(dateKey, todayKey) ? Color.GREEN : dateColor));
+            dateHeader.setTextColor(container == deletedHistoryContainer ? Color.RED : (container == archiveHistoryContainer ? Color.YELLOW : dateColor));
             dateHeader.setTextSize(13);
             dateHeader.setPadding(0, 16, 0, 4);
             dateHeader.setOnClickListener(v -> jumpToDate(dateKey, sdf));
             container.addView(dateHeader);
-
             for (int i = 0; i < notes.length; i++) {
                 final int index = i;
                 final String noteText = notes[i];
-
                 LinearLayout noteLayout = new LinearLayout(this);
                 noteLayout.setOrientation(LinearLayout.HORIZONTAL);
                 noteLayout.setGravity(Gravity.CENTER_VERTICAL);
                 noteLayout.setPadding(32, 4, 0, 4);
-
                 TextView tv = new TextView(this);
                 tv.setText(noteText);
                 tv.setTextColor(Color.WHITE);
                 tv.setTextSize(14);
                 tv.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
                 noteLayout.addView(tv);
-
                 int iconSize = (int) (28 * getResources().getDisplayMetrics().density);
-
-                // Share button for all history notes
                 ImageButton shareBtn = new ImageButton(this);
                 shareBtn.setImageResource(android.R.drawable.ic_menu_share);
                 shareBtn.setBackgroundColor(Color.TRANSPARENT);
@@ -1154,26 +1063,18 @@ public class MainActivity extends AppCompatActivity {
                 noteLayout.addView(shareBtn, new LinearLayout.LayoutParams(iconSize, iconSize));
                 shareBtn.setOnClickListener(v -> {
                     String[] options = {"Share as Text", "Share as .ics File"};
-                    new AlertDialog.Builder(this)
-                            .setTitle("Share Note")
-                            .setItems(options, (dialog, which) -> {
-                                if (which == 0) {
-                                    String textToShare = noteText.startsWith("• ") ? noteText.substring(2) : noteText;
-                                    Intent sendIntent = new Intent();
-                                    sendIntent.setAction(Intent.ACTION_SEND);
-                                    sendIntent.putExtra(Intent.EXTRA_TEXT, textToShare);
-                                    sendIntent.setType("text/plain");
-                                    Intent shareIntent = Intent.createChooser(sendIntent, "Share Note via");
-                                    startActivity(shareIntent);
-                                } else {
-                                    shareNoteAsIcs(noteText, dateKey);
-                                }
-                            })
-                            .show();
+                    new AlertDialog.Builder(this).setTitle("Share Note").setItems(options, (dialog, which) -> {
+                        if (which == 0) {
+                            String textToShare = getNoteBody(noteText);
+                            Intent sendIntent = new Intent();
+                            sendIntent.setAction(Intent.ACTION_SEND);
+                            sendIntent.putExtra(Intent.EXTRA_TEXT, textToShare);
+                            sendIntent.setType("text/plain");
+                            startActivity(Intent.createChooser(sendIntent, "Share Note via"));
+                        } else shareNoteAsIcs(noteText, dateKey);
+                    }).show();
                 });
-
                 if (container == archiveHistoryContainer || container == deletedHistoryContainer) {
-                    // Restore button
                     ImageButton restoreBtn = new ImageButton(this);
                     restoreBtn.setImageResource(android.R.drawable.ic_menu_revert);
                     restoreBtn.setBackgroundColor(Color.TRANSPARENT);
@@ -1181,24 +1082,15 @@ public class MainActivity extends AppCompatActivity {
                     restoreBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
                     noteLayout.addView(restoreBtn, new LinearLayout.LayoutParams(iconSize, iconSize));
                     restoreBtn.setOnClickListener(v -> restoreSingleNote(dateKey, index, prefs));
-
-                    // Delete button
                     ImageButton delBtn = new ImageButton(this);
                     delBtn.setImageResource(android.R.drawable.ic_menu_delete);
                     delBtn.setBackgroundColor(Color.TRANSPARENT);
                     delBtn.setPadding(4, 4, 4, 4);
                     delBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
                     noteLayout.addView(delBtn, new LinearLayout.LayoutParams(iconSize, iconSize));
-
-                    if (container == archiveHistoryContainer) {
-                        // Move from Archive to Trash
-                        delBtn.setOnClickListener(v -> deleteSingleNote(dateKey, index, prefs));
-                    } else if (container == deletedHistoryContainer) {
-                        // Permanent delete from Trash
-                        delBtn.setOnClickListener(v -> deleteSingleNotePermanently(dateKey, index, prefs));
-                    }
+                    if (container == archiveHistoryContainer) delBtn.setOnClickListener(v -> deleteSingleNote(dateKey, index, prefs));
+                    else if (container == deletedHistoryContainer) delBtn.setOnClickListener(v -> deleteSingleNotePermanently(dateKey, index, prefs));
                 }
-
                 tv.setOnLongClickListener(v -> {
                     android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
                     android.content.ClipData clip = android.content.ClipData.newPlainText("SAR Note", noteText);
@@ -1206,7 +1098,6 @@ public class MainActivity extends AppCompatActivity {
                     Toast.makeText(this, "Note copied", Toast.LENGTH_SHORT).show();
                     return true;
                 });
-
                 container.addView(noteLayout);
             }
         }
@@ -1226,6 +1117,24 @@ public class MainActivity extends AppCompatActivity {
                 mainScrollView.smoothScrollTo(0, 0);
             }
         } catch (Exception ignored) {}
+    }
+
+    private void updateAllWidgets() {
+        Context context = getApplicationContext();
+        AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
+        
+        int[] todayIds = appWidgetManager.getAppWidgetIds(new ComponentName(context, CalendarWidget.class));
+        if (todayIds.length > 0) {
+            Intent updateIntent = new Intent(context, CalendarWidget.class);
+            updateIntent.setAction(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
+            updateIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, todayIds);
+            sendBroadcast(updateIntent);
+        }
+        
+        int[] agendaIds = appWidgetManager.getAppWidgetIds(new ComponentName(context, AgendaWidgetProvider.class));
+        if (agendaIds.length > 0) {
+            appWidgetManager.notifyAppWidgetViewDataChanged(agendaIds, R.id.agenda_list);
+        }
     }
 
     private class CalendarAdapter extends BaseAdapter {
@@ -1273,7 +1182,7 @@ public class MainActivity extends AppCompatActivity {
             flag.setVisibility(hasNotes ? View.VISIBLE : View.INVISIBLE);
 
             if (hasPersonalNotes) {
-                flag.setImageTintList(ColorStateList.valueOf(Color.GREEN));
+                flag.setImageTintList(ColorStateList.valueOf(getColor(R.color.light_green)));
             } else if (hasArchivedNotes) {
                 flag.setImageTintList(ColorStateList.valueOf(Color.YELLOW));
             }
@@ -1299,17 +1208,13 @@ public class MainActivity extends AppCompatActivity {
             }
 
             itemView.setOnClickListener(v -> {
-                // Set the selected date to whatever cell was clicked
                 selectedDate.set(cellCal.get(Calendar.YEAR), cellCal.get(Calendar.MONTH), cellCal.get(Calendar.DAY_OF_MONTH));
 
-                // If the user clicked a day from a different month (padding days),
-                // move the calendar to that month automatically.
                 if (cellCal.get(Calendar.MONTH) != currentMonth.get(Calendar.MONTH)) {
                     calendar.set(Calendar.MONTH, cellCal.get(Calendar.MONTH));
                     calendar.set(Calendar.YEAR, cellCal.get(Calendar.YEAR));
                     updateCalendar();
                 } else {
-                    // Just update the UI if it's the same month
                     updateDateInfo(selectedDate.get(Calendar.YEAR), selectedDate.get(Calendar.MONTH), selectedDate.get(Calendar.DAY_OF_MONTH));
                     notifyDataSetChanged();
                 }
