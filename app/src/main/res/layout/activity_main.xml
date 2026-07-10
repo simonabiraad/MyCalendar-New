@@ -182,7 +182,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="32dp"
                     android:layout_marginStart="8dp"
-                    android:backgroundTint="@color/orange"
+                    android:backgroundTint="@color/light_green"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
                     android:paddingLeft="12dp"

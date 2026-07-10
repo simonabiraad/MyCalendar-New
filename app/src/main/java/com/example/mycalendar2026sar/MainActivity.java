@@ -168,7 +168,8 @@ public class MainActivity extends AppCompatActivity {
         saveNoteButton.setOnClickListener(v -> saveNote());
 
         findViewById(R.id.secureBoxButton).setOnClickListener(v -> {
-            Toast.makeText(this, "Secure Box feature coming soon!", Toast.LENGTH_SHORT).show();
+            Intent intent = new Intent(this, SecureBoxActivity.class);
+            startActivity(intent);
         });
 
         findViewById(R.id.notificationSettingsButton).setOnClickListener(v -> {
@@ -512,7 +513,11 @@ public class MainActivity extends AppCompatActivity {
     private TextView createRemarkTextView(String remarkText, int index, SharedPreferences sourcePrefs) {
         TextView textView = new TextView(this);
         textView.setText(remarkText);
-        textView.setTextColor(Color.WHITE);
+        if (remarkText.startsWith("▣ ")) {
+            textView.setTextColor(getColor(R.color.light_green));
+        } else {
+            textView.setTextColor(Color.WHITE);
+        }
         textView.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
         textView.setOnClickListener(v -> toggleNoteFinished(index, sourcePrefs));
@@ -1050,7 +1055,11 @@ public class MainActivity extends AppCompatActivity {
                 noteLayout.setPadding(32, 4, 0, 4);
                 TextView tv = new TextView(this);
                 tv.setText(noteText);
-                tv.setTextColor(Color.WHITE);
+                if (noteText.startsWith("▣ ")) {
+                    tv.setTextColor(getColor(R.color.light_green));
+                } else {
+                    tv.setTextColor(Color.WHITE);
+                }
                 tv.setTextSize(14);
                 tv.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
                 noteLayout.addView(tv);

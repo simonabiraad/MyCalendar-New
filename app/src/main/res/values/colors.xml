@@ -14,4 +14,7 @@
     <color name="light_green">#8BC34A</color>
     <color name="light_orange">#FFCC80</color>
     <color name="red">#FF0000</color>
+    <color name="honey">#FFC30B</color>
+    <color name="unmellow_yellow">#FFFF66</color>
+    <color name="hunter_green">#355E3B</color>
 </resources>
