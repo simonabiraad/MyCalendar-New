@@ -27,11 +27,11 @@ import java.util.List;
 
 public class SecureBoxActivity extends AppCompatActivity {
 
-    private LinearLayout personelNotesSection, passwordNotesSection, familyNotesSection, workNotesSection;
-    private GridLayout personelNotesContainer, passwordNotesContainer, familyNotesContainer, workNotesContainer;
-    private EditText personelNoteInput, passwordNoteInput, familyNoteInput, workNoteInput;
+    private LinearLayout personalNotesSection, passwordNotesSection, familyNotesSection, workNotesSection;
+    private GridLayout personalNotesContainer, passwordNotesContainer, familyNotesContainer, workNotesContainer;
+    private EditText personalNoteInput, passwordNoteInput, familyNoteInput, workNoteInput;
     private SharedPreferences securePrefs;
-    private static final String PERSONEL_KEY = "personel_notes";
+    private static final String PERSONAL_KEY = "personal_notes";
     private static final String PASSWORD_KEY = "password_notes";
     private static final String FAMILY_KEY = "family_notes";
     private static final String WORK_KEY = "work_notes";
@@ -49,9 +49,9 @@ public class SecureBoxActivity extends AppCompatActivity {
             return insets;
         });
 
-        personelNotesSection = findViewById(R.id.personelNotesSection);
-        personelNotesContainer = findViewById(R.id.personelNotesContainer);
-        personelNoteInput = findViewById(R.id.personelNoteInput);
+        personalNotesSection = findViewById(R.id.personalNotesSection);
+        personalNotesContainer = findViewById(R.id.personalNotesContainer);
+        personalNoteInput = findViewById(R.id.personalNoteInput);
 
         passwordNotesSection = findViewById(R.id.passwordNotesSection);
         passwordNotesContainer = findViewById(R.id.passwordNotesContainer);
@@ -65,24 +65,24 @@ public class SecureBoxActivity extends AppCompatActivity {
         workNotesContainer = findViewById(R.id.workNotesContainer);
         workNoteInput = findViewById(R.id.workNoteInput);
 
-        Button personelButton = findViewById(R.id.personelButton);
+        Button personalButton = findViewById(R.id.personalButton);
         Button passwordButton = findViewById(R.id.passwordButton);
         Button familyButton = findViewById(R.id.familyButton);
         Button workButton = findViewById(R.id.workButton);
 
-        Button savePersonelBtn = findViewById(R.id.savePersonelNoteButton);
+        Button savePersonalBtn = findViewById(R.id.savePersonalNoteButton);
         Button savePasswordBtn = findViewById(R.id.savePasswordNoteButton);
         Button saveFamilyBtn = findViewById(R.id.saveFamilyNoteButton);
         Button saveWorkBtn = findViewById(R.id.saveWorkNoteButton);
 
         securePrefs = getSharedPreferences("SecureBoxNotes", Context.MODE_PRIVATE);
 
-        personelButton.setOnClickListener(v -> toggleSection(personelNotesSection, PERSONEL_KEY, personelNotesContainer));
+        personalButton.setOnClickListener(v -> toggleSection(personalNotesSection, PERSONAL_KEY, personalNotesContainer));
         passwordButton.setOnClickListener(v -> toggleSection(passwordNotesSection, PASSWORD_KEY, passwordNotesContainer));
         familyButton.setOnClickListener(v -> toggleSection(familyNotesSection, FAMILY_KEY, familyNotesContainer));
         workButton.setOnClickListener(v -> toggleSection(workNotesSection, WORK_KEY, workNotesContainer));
 
-        savePersonelBtn.setOnClickListener(v -> saveNote(PERSONEL_KEY, personelNoteInput, personelNotesContainer));
+        savePersonalBtn.setOnClickListener(v -> saveNote(PERSONAL_KEY, personalNoteInput, personalNotesContainer));
         savePasswordBtn.setOnClickListener(v -> saveNote(PASSWORD_KEY, passwordNoteInput, passwordNotesContainer));
         saveFamilyBtn.setOnClickListener(v -> saveNote(FAMILY_KEY, familyNoteInput, familyNotesContainer));
         saveWorkBtn.setOnClickListener(v -> saveNote(WORK_KEY, workNoteInput, workNotesContainer));
@@ -98,7 +98,7 @@ public class SecureBoxActivity extends AppCompatActivity {
     }
 
     private void hideAllSections() {
-        personelNotesSection.setVisibility(View.GONE);
+        personalNotesSection.setVisibility(View.GONE);
         passwordNotesSection.setVisibility(View.GONE);
         familyNotesSection.setVisibility(View.GONE);
         workNotesSection.setVisibility(View.GONE);
@@ -145,7 +145,7 @@ public class SecureBoxActivity extends AppCompatActivity {
 
                 tv.setText(note);
 
-                if (key.equals(PERSONEL_KEY)) {
+                if (key.equals(PERSONAL_KEY)) {
                     card.setCardBackgroundColor(getColor(R.color.light_green));
                 } else if (key.equals(PASSWORD_KEY)) {
                     card.setCardBackgroundColor(getColor(R.color.unmellow_yellow));
@@ -185,8 +185,6 @@ public class SecureBoxActivity extends AppCompatActivity {
 
     private void showEditFullPage(String key, int index, String currentText, GridLayout container) {
         android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
-        dialog.setContentView(R.layout.activity_secure_box); // Reuse layout or create new one?
-        // Actually it's better to create a simple full screen edit layout programmatically or via new XML.
         // Let's create a simple one here.
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);

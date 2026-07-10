@@ -32,14 +32,14 @@
         app:layout_constraintTop_toBottomOf="@id/secureBoxTitle">
 
         <Button
-            android:id="@+id/personelButton"
+            android:id="@+id/personalButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginEnd="4dp"
             android:layout_weight="1"
             android:backgroundTint="@color/light_green"
             android:padding="0dp"
-            android:text="Personel"
+            android:text="Personal"
             android:textColor="@color/white"
             android:textSize="10sp" />
 
@@ -79,9 +79,9 @@
             android:textSize="10sp" />
     </LinearLayout>
 
-    <!-- Personel Section -->
+    <!-- Personal Section -->
     <LinearLayout
-        android:id="@+id/personelNotesSection"
+        android:id="@+id/personalNotesSection"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_marginTop="8dp"
@@ -94,10 +94,10 @@
         app:layout_constraintTop_toBottomOf="@id/buttonContainer">
 
         <EditText
-            android:id="@+id/personelNoteInput"
+            android:id="@+id/personalNoteInput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Enter personel note..."
+            android:hint="Enter personal note..."
             android:inputType="textMultiLine"
             android:minLines="1"
             android:maxLines="5"
@@ -105,7 +105,7 @@
             android:textColorHint="@color/white" />
 
         <Button
-            android:id="@+id/savePersonelNoteButton"
+            android:id="@+id/savePersonalNoteButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="end"
@@ -117,7 +117,7 @@
             android:layout_height="match_parent"
             android:layout_marginTop="8dp">
             <GridLayout
-                android:id="@+id/personelNotesContainer"
+                android:id="@+id/personalNotesContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:alignmentMode="alignMargins"
