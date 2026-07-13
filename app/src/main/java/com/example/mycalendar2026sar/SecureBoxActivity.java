@@ -14,6 +14,11 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.print.PrintAttributes;
+import android.print.PrintDocumentAdapter;
+import android.print.PrintManager;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
@@ -32,7 +37,7 @@ public class SecureBoxActivity extends AppCompatActivity {
     private GridLayout personalNotesContainer, passwordNotesContainer, familyNotesContainer, workNotesContainer;
     private EditText personalNoteInput, passwordNoteInput, familyNoteInput, workNoteInput;
     private ScrollView personalScrollView, passwordScrollView, familyScrollView, workScrollView;
-    private SharedPreferences securePrefs;
+    private SharedPreferences securePrefs, colorPrefs;
     private static final String PERSONAL_KEY = "personal_notes";
     private static final String PASSWORD_KEY = "password_notes";
     private static final String FAMILY_KEY = "family_notes";
@@ -82,6 +87,9 @@ public class SecureBoxActivity extends AppCompatActivity {
         Button saveWorkBtn = findViewById(R.id.saveWorkNoteButton);
 
         securePrefs = getSharedPreferences("SecureBoxNotes", Context.MODE_PRIVATE);
+        colorPrefs = getSharedPreferences("AppColors", Context.MODE_PRIVATE);
+
+        refreshColors();
 
         personalButton.setOnClickListener(v -> toggleSection(personalNotesSection, PERSONAL_KEY, personalNotesContainer));
         passwordButton.setOnClickListener(v -> toggleSection(passwordNotesSection, PASSWORD_KEY, passwordNotesContainer));
@@ -94,6 +102,39 @@ public class SecureBoxActivity extends AppCompatActivity {
         saveWorkBtn.setOnClickListener(v -> saveNote(WORK_KEY, workNoteInput, workNotesContainer, workScrollView));
 
         setupAutoScroll();
+    }
+
+    private void refreshColors() {
+        int personalColor = colorPrefs.getInt("color_sb_personal", getColor(R.color.light_green));
+        int passwordColor = colorPrefs.getInt("color_sb_password", getColor(R.color.unmellow_yellow));
+        int familyColor = colorPrefs.getInt("color_sb_family", getColor(R.color.blue));
+        int workColor = colorPrefs.getInt("color_sb_work", getColor(R.color.honey));
+        int mainTheme = colorPrefs.getInt("color_main_theme", getColor(R.color.light_green));
+        int bgColor = colorPrefs.getInt("color_app_background", Color.BLACK);
+
+        View root = findViewById(R.id.main);
+        if (root != null) root.setBackgroundColor(bgColor);
+
+        TextView title = findViewById(R.id.secureBoxTitle);
+        if (title != null) title.setTextColor(mainTheme);
+
+        View personalBtn = findViewById(R.id.personalButton);
+        if (personalBtn != null) personalBtn.setBackgroundTintList(android.content.res.ColorStateList.valueOf(personalColor));
+        View passwordBtn = findViewById(R.id.passwordButton);
+        if (passwordBtn != null) passwordBtn.setBackgroundTintList(android.content.res.ColorStateList.valueOf(passwordColor));
+        View familyBtn = findViewById(R.id.familyButton);
+        if (familyBtn != null) familyBtn.setBackgroundTintList(android.content.res.ColorStateList.valueOf(familyColor));
+        View workBtn = findViewById(R.id.workButton);
+        if (workBtn != null) workBtn.setBackgroundTintList(android.content.res.ColorStateList.valueOf(workColor));
+
+        View savePersonal = findViewById(R.id.savePersonalNoteButton);
+        if (savePersonal != null) savePersonal.setBackgroundTintList(android.content.res.ColorStateList.valueOf(personalColor));
+        View savePassword = findViewById(R.id.savePasswordNoteButton);
+        if (savePassword != null) savePassword.setBackgroundTintList(android.content.res.ColorStateList.valueOf(passwordColor));
+        View saveFamily = findViewById(R.id.saveFamilyNoteButton);
+        if (saveFamily != null) saveFamily.setBackgroundTintList(android.content.res.ColorStateList.valueOf(familyColor));
+        View saveWork = findViewById(R.id.saveWorkNoteButton);
+        if (saveWork != null) saveWork.setBackgroundTintList(android.content.res.ColorStateList.valueOf(workColor));
     }
 
     private void setupAutoScroll() {
@@ -196,13 +237,13 @@ public class SecureBoxActivity extends AppCompatActivity {
                 tv.setText(note);
 
                 if (key.equals(PERSONAL_KEY)) {
-                    card.setCardBackgroundColor(getColor(R.color.light_green));
+                    card.setCardBackgroundColor(colorPrefs.getInt("color_sb_personal", getColor(R.color.light_green)));
                 } else if (key.equals(PASSWORD_KEY)) {
-                    card.setCardBackgroundColor(getColor(R.color.unmellow_yellow));
+                    card.setCardBackgroundColor(colorPrefs.getInt("color_sb_password", getColor(R.color.unmellow_yellow)));
                 } else if (key.equals(FAMILY_KEY)) {
-                    card.setCardBackgroundColor(getColor(R.color.blue));
+                    card.setCardBackgroundColor(colorPrefs.getInt("color_sb_family", getColor(R.color.blue)));
                 } else if (key.equals(WORK_KEY)) {
-                    card.setCardBackgroundColor(getColor(R.color.honey));
+                    card.setCardBackgroundColor(colorPrefs.getInt("color_sb_work", getColor(R.color.honey)));
                 }
 
                 noteView.setOnClickListener(v -> showEditFullPage(key, index, note, container));
@@ -238,10 +279,10 @@ public class SecureBoxActivity extends AppCompatActivity {
 
         int bgColor;
         int textColor = Color.BLACK;
-        if (key.equals(PERSONAL_KEY)) bgColor = getColor(R.color.light_green);
-        else if (key.equals(PASSWORD_KEY)) bgColor = getColor(R.color.unmellow_yellow);
-        else if (key.equals(FAMILY_KEY)) bgColor = getColor(R.color.blue);
-        else if (key.equals(WORK_KEY)) bgColor = getColor(R.color.honey);
+        if (key.equals(PERSONAL_KEY)) bgColor = colorPrefs.getInt("color_sb_personal", getColor(R.color.light_green));
+        else if (key.equals(PASSWORD_KEY)) bgColor = colorPrefs.getInt("color_sb_password", getColor(R.color.unmellow_yellow));
+        else if (key.equals(FAMILY_KEY)) bgColor = colorPrefs.getInt("color_sb_family", getColor(R.color.blue));
+        else if (key.equals(WORK_KEY)) bgColor = colorPrefs.getInt("color_sb_work", getColor(R.color.honey));
         else bgColor = Color.BLACK;
 
         LinearLayout layout = new LinearLayout(this);
@@ -274,6 +315,18 @@ public class SecureBoxActivity extends AppCompatActivity {
         cancel.setTextColor(textColor);
         cancel.setOnClickListener(v -> dialog.dismiss());
         btnLayout.addView(cancel);
+
+        Button print = new Button(this);
+        print.setText("Print");
+        print.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.BLACK));
+        print.setTextColor(Color.WHITE);
+        print.setOnClickListener(v -> {
+            String textToPrint = edit.getText().toString().trim();
+            if (!textToPrint.isEmpty()) {
+                printSingleNote(textToPrint);
+            }
+        });
+        btnLayout.addView(print);
 
         Button save = new Button(this);
         save.setText("Save");
@@ -310,6 +363,27 @@ public class SecureBoxActivity extends AppCompatActivity {
             loadNotes(key, container);
             Toast.makeText(this, "Note updated", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void printSingleNote(String note) {
+        StringBuilder html = new StringBuilder("<html><body>");
+        html.append("<h1>Secure Note</h1>");
+        html.append("<p>").append(note.replace("\n", "<br>")).append("</p>");
+        html.append("</body></html>");
+        doPrint(html.toString(), "Secure_Note");
+    }
+
+    private void doPrint(String htmlContent, String jobName) {
+        WebView webView = new WebView(this);
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                PrintManager printManager = (PrintManager) getSystemService(Context.PRINT_SERVICE);
+                PrintDocumentAdapter printAdapter = view.createPrintDocumentAdapter(jobName);
+                printManager.print(jobName, printAdapter, new PrintAttributes.Builder().build());
+            }
+        });
+        webView.loadDataWithBaseURL(null, htmlContent, "text/HTML", "UTF-8", null);
     }
 
     private void deleteNote(String key, int index, GridLayout container) {

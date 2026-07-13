@@ -47,6 +47,11 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.content.FileProvider;
 
+import android.print.PrintAttributes;
+import android.print.PrintDocumentAdapter;
+import android.print.PrintManager;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.net.URLEncoder;
@@ -83,6 +88,7 @@ public class MainActivity extends AppCompatActivity {
     private SharedPreferences deletedPreferences;
     private SharedPreferences reminderPreferences;
     private SharedPreferences securityPrefs;
+    private SharedPreferences colorPrefs;
     private CalendarAdapter adapter;
 
     private String lastDeletedNote;
@@ -166,6 +172,7 @@ public class MainActivity extends AppCompatActivity {
         deletedPreferences = getSharedPreferences("DeletedNotes", Context.MODE_PRIVATE);
         reminderPreferences = getSharedPreferences("ReminderStatus", Context.MODE_PRIVATE);
         securityPrefs = getSharedPreferences("SecuritySettings", Context.MODE_PRIVATE);
+        colorPrefs = getSharedPreferences("AppColors", Context.MODE_PRIVATE);
 
         // Hide folders initially
         archiveHistoryContainer.setVisibility(View.GONE);
@@ -175,6 +182,8 @@ public class MainActivity extends AppCompatActivity {
         selectedDate = Calendar.getInstance();
         calendar = (Calendar) selectedDate.clone();
         calendar.set(Calendar.DAY_OF_MONTH, 1); // Start at beginning of current month
+
+        refreshUIColors();
 
         updateCalendar();
         updateRemarkHistory();
@@ -220,6 +229,8 @@ public class MainActivity extends AppCompatActivity {
             popup.getMenu().add("Secure Box");
             popup.getMenu().add("Change Password");
             popup.getMenu().add("Notification Settings");
+            popup.getMenu().add("Change Colors");
+            popup.getMenu().add("Print");
             popup.getMenu().add("About");
             popup.getMenu().add("Exit");
 
@@ -237,6 +248,10 @@ public class MainActivity extends AppCompatActivity {
                     showChangePasswordDialog();
                 } else if (title.equals("Notification Settings")) {
                     findViewById(R.id.notificationSettingsButton).performClick();
+                } else if (title.equals("Change Colors")) {
+                    showChangeColorsDialog();
+                } else if (title.equals("Print")) {
+                    showPrintDialog();
                 } else if (title.equals("About")) {
                     new AlertDialog.Builder(this)
                             .setTitle("About SAR Calendar")
@@ -457,7 +472,7 @@ public class MainActivity extends AppCompatActivity {
         String reminderKey = currentDateKey + "_" + remarkText;
         boolean hasReminder = reminderPreferences.contains(reminderKey);
         if (hasReminder) {
-            alarmButton.setImageTintList(ColorStateList.valueOf(getColor(R.color.light_green)));
+            alarmButton.setImageTintList(ColorStateList.valueOf(colorPrefs.getInt("color_main_theme", getColor(R.color.light_green))));
         } else {
             alarmButton.setImageTintList(null);
         }
@@ -653,9 +668,9 @@ public class MainActivity extends AppCompatActivity {
         TextView textView = new TextView(this);
         textView.setText(remarkText);
         if (remarkText.startsWith("▣ ")) {
-            textView.setTextColor(getColor(R.color.light_green));
+            textView.setTextColor(colorPrefs.getInt("color_note_checked", Color.GREEN));
         } else {
-            textView.setTextColor(Color.WHITE);
+            textView.setTextColor(colorPrefs.getInt("color_note_text", Color.WHITE));
         }
         textView.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
@@ -1077,7 +1092,7 @@ public class MainActivity extends AppCompatActivity {
 
         final Button dateButton = new Button(this);
         dateButton.setText("Date: " + sdf.format(noteDate.getTime()));
-        dateButton.setBackgroundTintList(ColorStateList.valueOf(getColor(R.color.light_green)));
+        dateButton.setBackgroundTintList(ColorStateList.valueOf(colorPrefs.getInt("color_main_theme", getColor(R.color.light_green))));
         dateButton.setTextColor(Color.WHITE);
         dateButton.setOnClickListener(v -> {
             new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
@@ -1132,18 +1147,23 @@ public class MainActivity extends AppCompatActivity {
         remarkHistoryContainer.removeAllViews();
         archiveHistoryContainer.removeAllViews();
         deletedHistoryContainer.removeAllViews();
+
+        int mainTheme = colorPrefs.getInt("color_main_theme", getColor(R.color.light_green));
+        int archiveColor = colorPrefs.getInt("color_archive", Color.YELLOW);
+        int deletedColor = colorPrefs.getInt("color_deleted", getColor(R.color.chili_red));
+
         int activeCount = countTotalNotes(sharedPreferences);
         TextView activeTitle = findViewById(R.id.remarkHistoryTitle);
         if (activeTitle != null) {
             String countText = getString(R.string.all_personal_notes) + " (" + activeCount + ")";
             activeTitle.setText(countText);
-            activeTitle.setTextColor(getColor(R.color.light_green));
+            activeTitle.setTextColor(mainTheme);
         }
-        loadHistoryFromPrefs(sharedPreferences, remarkHistoryContainer, R.string.no_notes_saved, getColor(R.color.light_green));
+        loadHistoryFromPrefs(sharedPreferences, remarkHistoryContainer, R.string.no_notes_saved, mainTheme);
         Button archiveBtn = new Button(this);
         archiveBtn.setText(R.string.archive_all_past_notes);
         archiveBtn.setTextSize(12);
-        archiveBtn.setBackgroundTintList(ColorStateList.valueOf(getColor(R.color.light_green)));
+        archiveBtn.setBackgroundTintList(ColorStateList.valueOf(mainTheme));
         archiveBtn.setTextColor(Color.WHITE);
         archiveBtn.setOnClickListener(v -> archiveAllPastNotes());
         remarkHistoryContainer.addView(archiveBtn);
@@ -1152,21 +1172,21 @@ public class MainActivity extends AppCompatActivity {
         if (archiveTitle != null) {
             String countText = getString(R.string.archive_folder) + " (" + archiveCount + ")";
             archiveTitle.setText(countText);
-            archiveTitle.setTextColor(Color.YELLOW);
+            archiveTitle.setTextColor(archiveColor);
         }
-        loadHistoryFromPrefs(archivePreferences, archiveHistoryContainer, R.string.no_archived_notes, Color.YELLOW);
+        loadHistoryFromPrefs(archivePreferences, archiveHistoryContainer, R.string.no_archived_notes, archiveColor);
         int deletedCount = countTotalNotes(deletedPreferences);
         TextView deletedTitle = findViewById(R.id.deletedHistoryTitle);
         if (deletedTitle != null) {
             String countText = getString(R.string.deleted_notes_title) + " (" + deletedCount + ")";
             deletedTitle.setText(countText);
-            deletedTitle.setTextColor(Color.RED);
+            deletedTitle.setTextColor(deletedColor);
         }
-        loadHistoryFromPrefs(deletedPreferences, deletedHistoryContainer, R.string.no_deleted_notes, Color.RED);
+        loadHistoryFromPrefs(deletedPreferences, deletedHistoryContainer, R.string.no_deleted_notes, deletedColor);
         Button clearTrashBtn = new Button(this);
         clearTrashBtn.setText(R.string.clear_trash_btn);
         clearTrashBtn.setTextSize(10);
-        clearTrashBtn.setBackgroundTintList(ColorStateList.valueOf(Color.RED));
+        clearTrashBtn.setBackgroundTintList(ColorStateList.valueOf(deletedColor));
         clearTrashBtn.setTextColor(Color.WHITE);
         clearTrashBtn.setOnClickListener(v -> new AlertDialog.Builder(MainActivity.this)
                 .setTitle("Clear Trash")
@@ -1260,7 +1280,7 @@ public class MainActivity extends AppCompatActivity {
             TextView dateHeader = new TextView(this);
             String label = Objects.equals(dateKey, todayKey) ? "TODAY: " + dateKey : "Date: " + dateKey;
             dateHeader.setText(label);
-            dateHeader.setTextColor(container == deletedHistoryContainer ? Color.RED : (container == archiveHistoryContainer ? Color.YELLOW : dateColor));
+            dateHeader.setTextColor(dateColor);
             dateHeader.setTextSize(13);
             dateHeader.setPadding(0, 16, 0, 4);
             dateHeader.setOnClickListener(v -> jumpToDate(dateKey, sdf));
@@ -1275,9 +1295,11 @@ public class MainActivity extends AppCompatActivity {
                 TextView tv = new TextView(this);
                 tv.setText(noteText);
                 if (noteText.startsWith("▣ ")) {
-                    tv.setTextColor(getColor(R.color.light_green));
+                    tv.setTextColor(colorPrefs.getInt("color_note_checked", Color.GREEN));
+                } else if (container == deletedHistoryContainer) {
+                    tv.setTextColor(Color.WHITE); // Keep deleted text white, header is red
                 } else {
-                    tv.setTextColor(Color.WHITE);
+                    tv.setTextColor(colorPrefs.getInt("color_note_text", Color.WHITE));
                 }
                 tv.setTextSize(14);
                 tv.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -1406,6 +1428,199 @@ public class MainActivity extends AppCompatActivity {
         builder.show();
     }
 
+    private void showChangeColorsDialog() {
+        String[] options = {
+                "Main Theme (Buttons/Title)",
+                "Active Note Text",
+                "Finished Note Text",
+                "Archive Folder Color",
+                "Deleted Folder Color",
+                "Secure Box: Personal Category",
+                "Secure Box: Password Category",
+                "Secure Box: Family Category",
+                "Secure Box: Work Category",
+                "App Background Color",
+                "Reset All Colors"
+        };
+        new AlertDialog.Builder(this)
+                .setTitle("Change Colors")
+                .setItems(options, (dialog, which) -> {
+                    if (which == 10) {
+                        resetColors();
+                    } else {
+                        showColorPicker(which);
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showColorPicker(int category) {
+        String[] colorNames = {"Green", "Light Green", "Blue", "Red", "Chili Red", "Orange", "Purple", "Gold", "Unmellow Yellow", "Honey", "Teal", "White", "Black"};
+        int[] colorValues = {
+                0xFF4CAF50, 0xFF8BC34A, 0xFF2196F3, 0xFFFF0000, 0xFFC21807,
+                0xFFFF9800, 0xFF9C27B0, 0xFFFFD700, 0xFFFFFF66, 0xFFFFC30B,
+                0xFF008080, 0xFFFFFFFF, 0xFF000000
+        };
+
+        new AlertDialog.Builder(this)
+                .setTitle("Select Color")
+                .setItems(colorNames, (dialog, which) -> {
+                    int selectedColor = colorValues[which];
+                    saveColor(category, selectedColor);
+                })
+                .show();
+    }
+
+    private void saveColor(int category, int color) {
+        String key;
+        switch (category) {
+            case 0: key = "color_main_theme"; break;
+            case 1: key = "color_note_text"; break;
+            case 2: key = "color_note_checked"; break;
+            case 3: key = "color_archive"; break;
+            case 4: key = "color_deleted"; break;
+            case 5: key = "color_sb_personal"; break;
+            case 6: key = "color_sb_password"; break;
+            case 7: key = "color_sb_family"; break;
+            case 8: key = "color_sb_work"; break;
+            case 9: key = "color_app_background"; break;
+            default: return;
+        }
+        colorPrefs.edit().putInt(key, color).apply();
+        refreshUIColors();
+        Toast.makeText(this, "Color updated!", Toast.LENGTH_SHORT).show();
+    }
+
+    private void resetColors() {
+        colorPrefs.edit().clear().apply();
+        refreshUIColors();
+        Toast.makeText(this, "Colors reset to default", Toast.LENGTH_SHORT).show();
+    }
+
+    private void refreshUIColors() {
+        int mainTheme = colorPrefs.getInt("color_main_theme", getColor(R.color.light_green));
+        int noteText = colorPrefs.getInt("color_note_text", Color.WHITE);
+        int noteChecked = colorPrefs.getInt("color_note_checked", Color.GREEN);
+        int archiveColor = colorPrefs.getInt("color_archive", Color.YELLOW);
+        int deletedColor = colorPrefs.getInt("color_deleted", getColor(R.color.chili_red));
+        int bgColor = colorPrefs.getInt("color_app_background", Color.BLACK);
+
+        // Root Background
+        View root = findViewById(R.id.main);
+        if (root != null) root.setBackgroundColor(bgColor);
+
+        // Header
+        TextView title = findViewById(R.id.titleTextView);
+        if (title != null) title.setTextColor(mainTheme);
+        TextView clock = findViewById(R.id.textClockDate);
+        if (clock != null) clock.setTextColor(mainTheme);
+        TextView remarkLbl = findViewById(R.id.remarkLabel);
+        if (remarkLbl != null) remarkLbl.setTextColor(mainTheme);
+
+        // Buttons
+        View saveBtn = findViewById(R.id.saveNoteButton);
+        if (saveBtn != null) saveBtn.setBackgroundTintList(ColorStateList.valueOf(mainTheme));
+        View secureBtn = findViewById(R.id.secureBoxButton);
+        if (secureBtn != null) secureBtn.setBackgroundTintList(ColorStateList.valueOf(mainTheme));
+        View notifyBtn = findViewById(R.id.notificationSettingsButton);
+        if (notifyBtn != null) notifyBtn.setBackgroundTintList(ColorStateList.valueOf(mainTheme));
+        ImageButton menuBtn = findViewById(R.id.mainMenuButton);
+        if (menuBtn != null) menuBtn.setImageTintList(ColorStateList.valueOf(mainTheme));
+        ImageButton voiceBtn = findViewById(R.id.voiceNoteButton);
+        if (voiceBtn != null) voiceBtn.setImageTintList(ColorStateList.valueOf(mainTheme));
+
+        // History
+        updateRemarkHistory(); // This will use the new colors during redraw
+        loadRemarksForSelectedDate();
+        if (adapter != null) adapter.notifyDataSetChanged();
+    }
+
+    private void showPrintDialog() {
+        String[] options = {"Selected Date's Notes", "All Personal Notes", "All Archived Notes", "All Deleted Notes"};
+        new AlertDialog.Builder(this)
+                .setTitle("Print Notes")
+                .setItems(options, (dialog, which) -> {
+                    switch (which) {
+                        case 0: printNotes(currentDateKey, sharedPreferences); break;
+                        case 1: printAllNotes(sharedPreferences, "All Personal Notes"); break;
+                        case 2: printAllNotes(archivePreferences, "All Archived Notes"); break;
+                        case 3: printAllNotes(deletedPreferences, "All Deleted Notes"); break;
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void printNotes(String dateKey, SharedPreferences prefs) {
+        String notes = prefs.getString(dateKey, "");
+        if (notes.isEmpty()) {
+            Toast.makeText(this, "No notes to print for " + dateKey, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        StringBuilder html = new StringBuilder("<html><body>");
+        html.append("<h1>Notes for ").append(dateKey).append("</h1>");
+        html.append("<ul>");
+        for (String note : notes.split("\n")) {
+            html.append("<li>").append(note).append("</li>");
+        }
+        html.append("</ul></body></html>");
+        
+        doPrint(html.toString(), "Notes_" + dateKey.replace("/", "_"));
+    }
+
+    private void printAllNotes(SharedPreferences prefs, String title) {
+        Map<String, ?> allEntries = prefs.getAll();
+        if (allEntries.isEmpty()) {
+            Toast.makeText(this, "No notes found in " + title, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        StringBuilder html = new StringBuilder("<html><body>");
+        html.append("<h1>").append(title).append("</h1>");
+
+        List<String> sortedKeys = new ArrayList<>(allEntries.keySet());
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
+        sortedKeys.sort((o1, o2) -> {
+            try {
+                Date d1 = sdf.parse(o1);
+                Date d2 = sdf.parse(o2);
+                if (d1 != null && d2 != null) return d1.compareTo(d2);
+            } catch (Exception ignored) {}
+            return o1.compareTo(o2);
+        });
+
+        for (String key : sortedKeys) {
+            Object val = allEntries.get(key);
+            String notes = val != null ? val.toString() : "";
+            if (!notes.isEmpty()) {
+                html.append("<h3>Date: ").append(key).append("</h3>");
+                html.append("<ul>");
+                for (String note : notes.split("\n")) {
+                    html.append("<li>").append(note).append("</li>");
+                }
+                html.append("</ul>");
+            }
+        }
+        html.append("</body></html>");
+
+        doPrint(html.toString(), title.replace(" ", "_"));
+    }
+
+    private void doPrint(String htmlContent, String jobName) {
+        WebView webView = new WebView(this);
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                PrintManager printManager = (PrintManager) getSystemService(Context.PRINT_SERVICE);
+                PrintDocumentAdapter printAdapter = view.createPrintDocumentAdapter(jobName);
+                printManager.print(jobName, printAdapter, new PrintAttributes.Builder().build());
+            }
+        });
+        webView.loadDataWithBaseURL(null, htmlContent, "text/HTML", "UTF-8", null);
+    }
+
     private class CalendarAdapter extends BaseAdapter {
         private final ArrayList<Date> days;
         private final Calendar currentMonth;
@@ -1451,9 +1666,9 @@ public class MainActivity extends AppCompatActivity {
             flag.setVisibility(hasNotes ? View.VISIBLE : View.INVISIBLE);
 
             if (hasPersonalNotes) {
-                flag.setImageTintList(ColorStateList.valueOf(getColor(R.color.light_green)));
+                flag.setImageTintList(ColorStateList.valueOf(colorPrefs.getInt("color_main_theme", getColor(R.color.light_green))));
             } else if (hasArchivedNotes) {
-                flag.setImageTintList(ColorStateList.valueOf(Color.YELLOW));
+                flag.setImageTintList(ColorStateList.valueOf(colorPrefs.getInt("color_archive", Color.YELLOW)));
             }
 
             if (cellCal.get(Calendar.MONTH) != currentMonth.get(Calendar.MONTH)) {
