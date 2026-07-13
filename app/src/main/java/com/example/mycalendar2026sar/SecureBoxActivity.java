@@ -201,7 +201,7 @@ public class SecureBoxActivity extends AppCompatActivity {
         EditText edit = new EditText(this);
         edit.setText(currentText);
         edit.setTextColor(Color.WHITE);
-        edit.setGravity(android.view.Gravity.TOP);
+        edit.setGravity(android.view.Gravity.START | android.view.Gravity.TOP);
         edit.setBackground(null);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
         edit.setLayoutParams(lp);

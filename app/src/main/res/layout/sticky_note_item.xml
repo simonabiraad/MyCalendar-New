@@ -20,11 +20,11 @@
 
         <TextView
             android:id="@+id/noteText"
-            android:layout_width="260dp"
-            android:layout_height="284dp"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
             android:ellipsize="end"
             android:fontFamily="sans-serif-medium"
-            android:gravity="center"
+            android:gravity="start|top"
             android:padding="12dp"
             android:textColor="@color/black"
             android:textSize="14sp" />
