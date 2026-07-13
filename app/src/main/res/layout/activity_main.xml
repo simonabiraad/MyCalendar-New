@@ -18,6 +18,18 @@
             android:layout_height="wrap_content"
             android:padding="16dp">
 
+            <ImageButton
+                android:id="@+id/mainMenuButton"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Menu"
+                android:src="@android:drawable/ic_menu_sort_by_size"
+                app:layout_constraintBottom_toBottomOf="@id/logoTitleContainer"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="@id/logoTitleContainer"
+                app:tint="@color/light_green" />
+
             <LinearLayout
                 android:id="@+id/logoTitleContainer"
                 android:layout_width="wrap_content"

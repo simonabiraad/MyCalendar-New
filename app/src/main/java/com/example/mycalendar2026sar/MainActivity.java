@@ -32,6 +32,7 @@ import android.widget.Toast;
 import com.google.android.material.snackbar.Snackbar;
 
 import androidx.annotation.NonNull;
+import androidx.activity.OnBackPressedCallback;
 import androidx.biometric.BiometricManager;
 import androidx.biometric.BiometricPrompt;
 import androidx.core.content.ContextCompat;
@@ -111,6 +112,18 @@ public class MainActivity extends AppCompatActivity {
             return insets;
         });
 
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle("Close App")
+                        .setMessage("Are you sure you want to close the app?")
+                        .setPositiveButton("Yes", (dialog, which) -> finish())
+                        .setNegativeButton("No", null)
+                        .show();
+            }
+        });
+
         calendarGrid = findViewById(R.id.calendarGrid);
         monthYearText = findViewById(R.id.monthYearText);
         noteInput = findViewById(R.id.noteInput);
@@ -171,6 +184,33 @@ public class MainActivity extends AppCompatActivity {
         });
         
         saveNoteButton.setOnClickListener(v -> saveNote());
+
+        findViewById(R.id.mainMenuButton).setOnClickListener(v -> {
+            android.widget.PopupMenu popup = new android.widget.PopupMenu(this, v);
+            popup.getMenu().add("Secure Box");
+            popup.getMenu().add("Notification Settings");
+            popup.getMenu().add("About");
+            popup.getMenu().add("Exit");
+
+            popup.setOnMenuItemClickListener(item -> {
+                String title = item.getTitle().toString();
+                if (title.equals("Secure Box")) {
+                    findViewById(R.id.secureBoxButton).performClick();
+                } else if (title.equals("Notification Settings")) {
+                    findViewById(R.id.notificationSettingsButton).performClick();
+                } else if (title.equals("About")) {
+                    new AlertDialog.Builder(this)
+                            .setTitle("About SAR Calendar")
+                            .setMessage("SAR Calendar 2026\nVersion 1.0\nCreated with care.")
+                            .setPositiveButton("OK", null)
+                            .show();
+                } else if (title.equals("Exit")) {
+                    getOnBackPressedDispatcher().onBackPressed();
+                }
+                return true;
+            });
+            popup.show();
+        });
 
         findViewById(R.id.secureBoxButton).setOnClickListener(v -> {
             Executor executor = ContextCompat.getMainExecutor(this);
