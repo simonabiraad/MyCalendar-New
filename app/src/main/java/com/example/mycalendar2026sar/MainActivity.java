@@ -80,6 +80,7 @@ public class MainActivity extends AppCompatActivity {
     private SharedPreferences archivePreferences;
     private SharedPreferences deletedPreferences;
     private SharedPreferences reminderPreferences;
+    private SharedPreferences securityPrefs;
     private CalendarAdapter adapter;
 
     private String lastDeletedNote;
@@ -143,6 +144,7 @@ public class MainActivity extends AppCompatActivity {
         archivePreferences = getSharedPreferences("ArchivedNotes", Context.MODE_PRIVATE);
         deletedPreferences = getSharedPreferences("DeletedNotes", Context.MODE_PRIVATE);
         reminderPreferences = getSharedPreferences("ReminderStatus", Context.MODE_PRIVATE);
+        securityPrefs = getSharedPreferences("SecuritySettings", Context.MODE_PRIVATE);
 
         // Hide folders initially
         archiveHistoryContainer.setVisibility(View.GONE);
@@ -188,6 +190,7 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.mainMenuButton).setOnClickListener(v -> {
             android.widget.PopupMenu popup = new android.widget.PopupMenu(this, v);
             popup.getMenu().add("Secure Box");
+            popup.getMenu().add("Change Password");
             popup.getMenu().add("Notification Settings");
             popup.getMenu().add("About");
             popup.getMenu().add("Exit");
@@ -196,6 +199,8 @@ public class MainActivity extends AppCompatActivity {
                 String title = item.getTitle().toString();
                 if (title.equals("Secure Box")) {
                     findViewById(R.id.secureBoxButton).performClick();
+                } else if (title.equals("Change Password")) {
+                    showChangePasswordDialog();
                 } else if (title.equals("Notification Settings")) {
                     findViewById(R.id.notificationSettingsButton).performClick();
                 } else if (title.equals("About")) {
@@ -213,38 +218,63 @@ public class MainActivity extends AppCompatActivity {
         });
 
         findViewById(R.id.secureBoxButton).setOnClickListener(v -> {
-            Executor executor = ContextCompat.getMainExecutor(this);
-            BiometricPrompt biometricPrompt = new BiometricPrompt(MainActivity.this,
-                    executor, new BiometricPrompt.AuthenticationCallback() {
-                @Override
-                public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
-                    super.onAuthenticationError(errorCode, errString);
-                    if (errorCode != BiometricPrompt.ERROR_USER_CANCELED && errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
-                        Toast.makeText(getApplicationContext(), "Authentication error: " + errString, Toast.LENGTH_SHORT).show();
+            String customPass = securityPrefs.getString("custom_password", null);
+            
+            if (customPass != null) {
+                // Use custom password
+                AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                builder.setTitle("Secure Box Access");
+                builder.setMessage("Enter your custom password:");
+
+                final EditText input = new EditText(this);
+                input.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+                builder.setView(input);
+
+                builder.setPositiveButton("Access", (dialog, which) -> {
+                    String entered = input.getText().toString().trim();
+                    if (entered.equals(customPass)) {
+                        startActivity(new Intent(this, SecureBoxActivity.class));
+                    } else {
+                        Toast.makeText(this, "Incorrect Password", Toast.LENGTH_SHORT).show();
                     }
-                }
+                });
+                builder.setNegativeButton("Cancel", null);
+                builder.show();
+            } else {
+                // Fallback to biometric/device lock
+                Executor executor = ContextCompat.getMainExecutor(this);
+                BiometricPrompt biometricPrompt = new BiometricPrompt(MainActivity.this,
+                        executor, new BiometricPrompt.AuthenticationCallback() {
+                    @Override
+                    public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
+                        super.onAuthenticationError(errorCode, errString);
+                        if (errorCode != BiometricPrompt.ERROR_USER_CANCELED && errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
+                            Toast.makeText(getApplicationContext(), "Authentication error: " + errString, Toast.LENGTH_SHORT).show();
+                        }
+                    }
 
-                @Override
-                public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
-                    super.onAuthenticationSucceeded(result);
-                    Intent intent = new Intent(MainActivity.this, SecureBoxActivity.class);
-                    startActivity(intent);
-                }
+                    @Override
+                    public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
+                        super.onAuthenticationSucceeded(result);
+                        Intent intent = new Intent(MainActivity.this, SecureBoxActivity.class);
+                        startActivity(intent);
+                    }
 
-                @Override
-                public void onAuthenticationFailed() {
-                    super.onAuthenticationFailed();
-                    Toast.makeText(getApplicationContext(), "Authentication failed", Toast.LENGTH_SHORT).show();
-                }
-            });
+                    @Override
+                    public void onAuthenticationFailed() {
+                        super.onAuthenticationFailed();
+                        Toast.makeText(getApplicationContext(), "Authentication failed", Toast.LENGTH_SHORT).show();
+                    }
+                });
 
-            BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
-                    .setTitle("Secure Box Access")
-                    .setSubtitle("Use your phone's PIN, Pattern, or Biometrics")
-                    .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG | BiometricManager.Authenticators.DEVICE_CREDENTIAL)
-                    .build();
+                BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
+                        .setTitle("Secure Box Access")
+                        .setSubtitle("Use your phone's PIN, Pattern, or Biometrics")
+                        .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG | BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+                        .build();
 
-            biometricPrompt.authenticate(promptInfo);
+                biometricPrompt.authenticate(promptInfo);
+            }
         });
 
         findViewById(R.id.notificationSettingsButton).setOnClickListener(v -> {
@@ -1219,6 +1249,44 @@ public class MainActivity extends AppCompatActivity {
         if (agendaIds.length > 0) {
             appWidgetManager.notifyAppWidgetViewDataChanged(agendaIds, R.id.agenda_list);
         }
+    }
+
+    private void showChangePasswordDialog() {
+        String[] options = {"Use Phone Lock Screen (Fingerprint/PIN)", "Set a New Custom Password"};
+        new AlertDialog.Builder(this)
+                .setTitle("Secure Box Access Type")
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) {
+                        securityPrefs.edit().remove("custom_password").apply();
+                        Toast.makeText(this, "Secure Box now synchronized with phone lock.", Toast.LENGTH_SHORT).show();
+                    } else {
+                        showSetCustomPasswordDialog();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showSetCustomPasswordDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Set New Password");
+        builder.setMessage("Enter the custom password you want for the Secure Box:");
+
+        final EditText input = new EditText(this);
+        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        builder.setView(input);
+
+        builder.setPositiveButton("Save", (dialog, which) -> {
+            String newPass = input.getText().toString().trim();
+            if (!newPass.isEmpty()) {
+                securityPrefs.edit().putString("custom_password", newPass).apply();
+                Toast.makeText(this, "Custom password saved!", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "Password cannot be empty", Toast.LENGTH_SHORT).show();
+            }
+        });
+        builder.setNegativeButton("Cancel", null);
+        builder.show();
     }
 
     private class CalendarAdapter extends BaseAdapter {
