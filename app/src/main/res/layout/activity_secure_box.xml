@@ -114,6 +114,7 @@
             android:text="Save" />
 
         <ScrollView
+            android:id="@+id/personalScrollView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_marginTop="8dp">
@@ -162,6 +163,7 @@
             android:text="Save" />
 
         <ScrollView
+            android:id="@+id/passwordScrollView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_marginTop="8dp">
@@ -210,6 +212,7 @@
             android:text="Save" />
 
         <ScrollView
+            android:id="@+id/familyScrollView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_marginTop="8dp">
@@ -258,6 +261,7 @@
             android:text="Save" />
 
         <ScrollView
+            android:id="@+id/workScrollView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_marginTop="8dp">

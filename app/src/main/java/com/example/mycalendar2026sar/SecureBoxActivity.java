@@ -11,6 +11,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.GridLayout;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -30,6 +31,7 @@ public class SecureBoxActivity extends AppCompatActivity {
     private LinearLayout personalNotesSection, passwordNotesSection, familyNotesSection, workNotesSection;
     private GridLayout personalNotesContainer, passwordNotesContainer, familyNotesContainer, workNotesContainer;
     private EditText personalNoteInput, passwordNoteInput, familyNoteInput, workNoteInput;
+    private ScrollView personalScrollView, passwordScrollView, familyScrollView, workScrollView;
     private SharedPreferences securePrefs;
     private static final String PERSONAL_KEY = "personal_notes";
     private static final String PASSWORD_KEY = "password_notes";
@@ -52,18 +54,22 @@ public class SecureBoxActivity extends AppCompatActivity {
         personalNotesSection = findViewById(R.id.personalNotesSection);
         personalNotesContainer = findViewById(R.id.personalNotesContainer);
         personalNoteInput = findViewById(R.id.personalNoteInput);
+        personalScrollView = findViewById(R.id.personalScrollView);
 
         passwordNotesSection = findViewById(R.id.passwordNotesSection);
         passwordNotesContainer = findViewById(R.id.passwordNotesContainer);
         passwordNoteInput = findViewById(R.id.passwordNoteInput);
+        passwordScrollView = findViewById(R.id.passwordScrollView);
 
         familyNotesSection = findViewById(R.id.familyNotesSection);
         familyNotesContainer = findViewById(R.id.familyNotesContainer);
         familyNoteInput = findViewById(R.id.familyNoteInput);
+        familyScrollView = findViewById(R.id.familyScrollView);
 
         workNotesSection = findViewById(R.id.workNotesSection);
         workNotesContainer = findViewById(R.id.workNotesContainer);
         workNoteInput = findViewById(R.id.workNoteInput);
+        workScrollView = findViewById(R.id.workScrollView);
 
         Button personalButton = findViewById(R.id.personalButton);
         Button passwordButton = findViewById(R.id.passwordButton);
@@ -82,10 +88,53 @@ public class SecureBoxActivity extends AppCompatActivity {
         familyButton.setOnClickListener(v -> toggleSection(familyNotesSection, FAMILY_KEY, familyNotesContainer));
         workButton.setOnClickListener(v -> toggleSection(workNotesSection, WORK_KEY, workNotesContainer));
 
-        savePersonalBtn.setOnClickListener(v -> saveNote(PERSONAL_KEY, personalNoteInput, personalNotesContainer));
-        savePasswordBtn.setOnClickListener(v -> saveNote(PASSWORD_KEY, passwordNoteInput, passwordNotesContainer));
-        saveFamilyBtn.setOnClickListener(v -> saveNote(FAMILY_KEY, familyNoteInput, familyNotesContainer));
-        saveWorkBtn.setOnClickListener(v -> saveNote(WORK_KEY, workNoteInput, workNotesContainer));
+        savePersonalBtn.setOnClickListener(v -> saveNote(PERSONAL_KEY, personalNoteInput, personalNotesContainer, personalScrollView));
+        savePasswordBtn.setOnClickListener(v -> saveNote(PASSWORD_KEY, passwordNoteInput, passwordNotesContainer, passwordScrollView));
+        saveFamilyBtn.setOnClickListener(v -> saveNote(FAMILY_KEY, familyNoteInput, familyNotesContainer, familyScrollView));
+        saveWorkBtn.setOnClickListener(v -> saveNote(WORK_KEY, workNoteInput, workNotesContainer, workScrollView));
+
+        setupAutoScroll();
+    }
+
+    private void setupAutoScroll() {
+        View.OnFocusChangeListener scrollListener = (v, hasFocus) -> {
+            if (hasFocus) {
+                final ScrollView activeScrollView;
+                if (v == personalNoteInput) activeScrollView = personalScrollView;
+                else if (v == passwordNoteInput) activeScrollView = passwordScrollView;
+                else if (v == familyNoteInput) activeScrollView = familyScrollView;
+                else if (v == workNoteInput) activeScrollView = workScrollView;
+                else activeScrollView = null;
+
+                if (activeScrollView != null) {
+                    activeScrollView.postDelayed(() -> activeScrollView.fullScroll(View.FOCUS_DOWN), 300);
+                }
+            }
+        };
+
+        personalNoteInput.setOnFocusChangeListener(scrollListener);
+        passwordNoteInput.setOnFocusChangeListener(scrollListener);
+        familyNoteInput.setOnFocusChangeListener(scrollListener);
+        workNoteInput.setOnFocusChangeListener(scrollListener);
+        
+        // Also scroll when clicking
+        View.OnClickListener clickListener = v -> {
+            final ScrollView activeScrollView;
+            if (v == personalNoteInput) activeScrollView = personalScrollView;
+            else if (v == passwordNoteInput) activeScrollView = passwordScrollView;
+            else if (v == familyNoteInput) activeScrollView = familyScrollView;
+            else if (v == workNoteInput) activeScrollView = workScrollView;
+            else activeScrollView = null;
+
+            if (activeScrollView != null) {
+                activeScrollView.postDelayed(() -> activeScrollView.fullScroll(View.FOCUS_DOWN), 300);
+            }
+        };
+        
+        personalNoteInput.setOnClickListener(clickListener);
+        passwordNoteInput.setOnClickListener(clickListener);
+        familyNoteInput.setOnClickListener(clickListener);
+        workNoteInput.setOnClickListener(clickListener);
     }
 
     private void toggleSection(LinearLayout section, String key, GridLayout container) {
@@ -104,7 +153,7 @@ public class SecureBoxActivity extends AppCompatActivity {
         workNotesSection.setVisibility(View.GONE);
     }
 
-    private void saveNote(String key, EditText input, GridLayout container) {
+    private void saveNote(String key, EditText input, GridLayout container, ScrollView scrollView) {
         String note = input.getText().toString().trim();
         if (note.isEmpty()) {
             Toast.makeText(this, "Please enter a note", Toast.LENGTH_SHORT).show();
@@ -117,6 +166,7 @@ public class SecureBoxActivity extends AppCompatActivity {
 
         input.setText("");
         loadNotes(key, container);
+        scrollView.postDelayed(() -> scrollView.fullScroll(View.FOCUS_DOWN), 100);
         Toast.makeText(this, "Note saved!", Toast.LENGTH_SHORT).show();
     }
 
@@ -185,22 +235,30 @@ public class SecureBoxActivity extends AppCompatActivity {
 
     private void showEditFullPage(String key, int index, String currentText, GridLayout container) {
         android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
-        // Let's create a simple one here.
+
+        int bgColor;
+        int textColor = Color.BLACK;
+        if (key.equals(PERSONAL_KEY)) bgColor = getColor(R.color.light_green);
+        else if (key.equals(PASSWORD_KEY)) bgColor = getColor(R.color.unmellow_yellow);
+        else if (key.equals(FAMILY_KEY)) bgColor = getColor(R.color.blue);
+        else if (key.equals(WORK_KEY)) bgColor = getColor(R.color.honey);
+        else bgColor = Color.BLACK;
+
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setBackgroundColor(Color.BLACK);
+        layout.setBackgroundColor(bgColor);
         layout.setPadding(32, 32, 32, 32);
 
         TextView title = new TextView(this);
         title.setText("Edit Note");
-        title.setTextColor(getColor(R.color.light_green));
+        title.setTextColor(textColor);
         title.setTextSize(20);
         title.setPadding(0, 0, 0, 16);
         layout.addView(title);
 
         EditText edit = new EditText(this);
         edit.setText(currentText);
-        edit.setTextColor(Color.WHITE);
+        edit.setTextColor(textColor);
         edit.setGravity(android.view.Gravity.START | android.view.Gravity.TOP);
         edit.setBackground(null);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
@@ -213,12 +271,14 @@ public class SecureBoxActivity extends AppCompatActivity {
 
         Button cancel = new Button(this);
         cancel.setText("Cancel");
+        cancel.setTextColor(textColor);
         cancel.setOnClickListener(v -> dialog.dismiss());
         btnLayout.addView(cancel);
 
         Button save = new Button(this);
         save.setText("Save");
-        save.setBackgroundTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.light_green)));
+        save.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.BLACK));
+        save.setTextColor(Color.WHITE);
         save.setOnClickListener(v -> {
             String newText = edit.getText().toString().trim();
             if (!newText.isEmpty()) {
