@@ -3,6 +3,7 @@ package com.example.mycalendar2026sar;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -37,7 +38,7 @@ public class SecureBoxActivity extends AppCompatActivity {
     private GridLayout personalNotesContainer, passwordNotesContainer, familyNotesContainer, workNotesContainer;
     private EditText personalNoteInput, passwordNoteInput, familyNoteInput, workNoteInput;
     private ScrollView personalScrollView, passwordScrollView, familyScrollView, workScrollView;
-    private SharedPreferences securePrefs, colorPrefs;
+    private SharedPreferences securePrefs, colorPrefs, fontPrefs;
     private static final String PERSONAL_KEY = "personal_notes";
     private static final String PASSWORD_KEY = "password_notes";
     private static final String FAMILY_KEY = "family_notes";
@@ -88,6 +89,7 @@ public class SecureBoxActivity extends AppCompatActivity {
 
         securePrefs = getSharedPreferences("SecureBoxNotes", Context.MODE_PRIVATE);
         colorPrefs = getSharedPreferences("AppColors", Context.MODE_PRIVATE);
+        fontPrefs = getSharedPreferences("AppFonts", Context.MODE_PRIVATE);
 
         refreshColors();
 
@@ -116,25 +118,79 @@ public class SecureBoxActivity extends AppCompatActivity {
         if (root != null) root.setBackgroundColor(bgColor);
 
         TextView title = findViewById(R.id.secureBoxTitle);
-        if (title != null) title.setTextColor(mainTheme);
+        if (title != null) {
+            title.setTextColor(mainTheme);
+            applyFontSettings(title, 24);
+        }
 
-        View personalBtn = findViewById(R.id.personalButton);
-        if (personalBtn != null) personalBtn.setBackgroundTintList(android.content.res.ColorStateList.valueOf(personalColor));
-        View passwordBtn = findViewById(R.id.passwordButton);
-        if (passwordBtn != null) passwordBtn.setBackgroundTintList(android.content.res.ColorStateList.valueOf(passwordColor));
-        View familyBtn = findViewById(R.id.familyButton);
-        if (familyBtn != null) familyBtn.setBackgroundTintList(android.content.res.ColorStateList.valueOf(familyColor));
-        View workBtn = findViewById(R.id.workButton);
-        if (workBtn != null) workBtn.setBackgroundTintList(android.content.res.ColorStateList.valueOf(workColor));
+        Button personalBtn = findViewById(R.id.personalButton);
+        if (personalBtn != null) {
+            personalBtn.setBackgroundTintList(android.content.res.ColorStateList.valueOf(personalColor));
+            applyFontSettings(personalBtn, 10);
+        }
+        Button passwordBtn = findViewById(R.id.passwordButton);
+        if (passwordBtn != null) {
+            passwordBtn.setBackgroundTintList(android.content.res.ColorStateList.valueOf(passwordColor));
+            applyFontSettings(passwordBtn, 10);
+        }
+        Button familyBtn = findViewById(R.id.familyButton);
+        if (familyBtn != null) {
+            familyBtn.setBackgroundTintList(android.content.res.ColorStateList.valueOf(familyColor));
+            applyFontSettings(familyBtn, 10);
+        }
+        Button workBtn = findViewById(R.id.workButton);
+        if (workBtn != null) {
+            workBtn.setBackgroundTintList(android.content.res.ColorStateList.valueOf(workColor));
+            applyFontSettings(workBtn, 10);
+        }
 
-        View savePersonal = findViewById(R.id.savePersonalNoteButton);
-        if (savePersonal != null) savePersonal.setBackgroundTintList(android.content.res.ColorStateList.valueOf(personalColor));
-        View savePassword = findViewById(R.id.savePasswordNoteButton);
-        if (savePassword != null) savePassword.setBackgroundTintList(android.content.res.ColorStateList.valueOf(passwordColor));
-        View saveFamily = findViewById(R.id.saveFamilyNoteButton);
-        if (saveFamily != null) saveFamily.setBackgroundTintList(android.content.res.ColorStateList.valueOf(familyColor));
-        View saveWork = findViewById(R.id.saveWorkNoteButton);
-        if (saveWork != null) saveWork.setBackgroundTintList(android.content.res.ColorStateList.valueOf(workColor));
+        Button savePersonal = findViewById(R.id.savePersonalNoteButton);
+        if (savePersonal != null) {
+            savePersonal.setBackgroundTintList(android.content.res.ColorStateList.valueOf(personalColor));
+            applyFontSettings(savePersonal, 14);
+        }
+        Button savePassword = findViewById(R.id.savePasswordNoteButton);
+        if (savePassword != null) {
+            savePassword.setBackgroundTintList(android.content.res.ColorStateList.valueOf(passwordColor));
+            applyFontSettings(savePassword, 14);
+        }
+        Button saveFamily = findViewById(R.id.saveFamilyNoteButton);
+        if (saveFamily != null) {
+            saveFamily.setBackgroundTintList(android.content.res.ColorStateList.valueOf(familyColor));
+            applyFontSettings(saveFamily, 14);
+        }
+        Button saveWork = findViewById(R.id.saveWorkNoteButton);
+        if (saveWork != null) {
+            saveWork.setBackgroundTintList(android.content.res.ColorStateList.valueOf(workColor));
+            applyFontSettings(saveWork, 14);
+        }
+
+        // Apply to inputs
+        if (personalNoteInput != null) applyFontSettings(personalNoteInput, 18);
+        if (passwordNoteInput != null) applyFontSettings(passwordNoteInput, 18);
+        if (familyNoteInput != null) applyFontSettings(familyNoteInput, 18);
+        if (workNoteInput != null) applyFontSettings(workNoteInput, 18);
+    }
+
+    private void applyFontSettings(TextView textView, float baseSize) {
+        int styleIndex = fontPrefs.getInt("font_style", 0);
+        Typeface tf = Typeface.DEFAULT;
+        switch (styleIndex) {
+            case 1: tf = Typeface.SANS_SERIF; break;
+            case 2: tf = Typeface.SERIF; break;
+            case 3: tf = Typeface.MONOSPACE; break;
+        }
+        textView.setTypeface(tf);
+
+        int sizeIndex = fontPrefs.getInt("font_size_index", 1);
+        float multiplier = 1.0f;
+        switch (sizeIndex) {
+            case 0: multiplier = 0.8f; break;
+            case 1: multiplier = 1.0f; break;
+            case 2: multiplier = 1.3f; break;
+            case 3: multiplier = 1.6f; break;
+        }
+        textView.setTextSize(baseSize * multiplier);
     }
 
     private void setupAutoScroll() {
@@ -235,6 +291,7 @@ public class SecureBoxActivity extends AppCompatActivity {
                 MaterialCardView card = noteView.findViewById(R.id.cardView);
 
                 tv.setText(note);
+                applyFontSettings(tv, 14);
 
                 if (key.equals(PERSONAL_KEY)) {
                     card.setCardBackgroundColor(colorPrefs.getInt("color_sb_personal", getColor(R.color.light_green)));
@@ -293,13 +350,14 @@ public class SecureBoxActivity extends AppCompatActivity {
         TextView title = new TextView(this);
         title.setText("Edit Note");
         title.setTextColor(textColor);
-        title.setTextSize(20);
+        applyFontSettings(title, 20);
         title.setPadding(0, 0, 0, 16);
         layout.addView(title);
 
         EditText edit = new EditText(this);
         edit.setText(currentText);
         edit.setTextColor(textColor);
+        applyFontSettings(edit, 18);
         edit.setGravity(android.view.Gravity.START | android.view.Gravity.TOP);
         edit.setBackground(null);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
@@ -313,11 +371,13 @@ public class SecureBoxActivity extends AppCompatActivity {
         Button cancel = new Button(this);
         cancel.setText("Cancel");
         cancel.setTextColor(textColor);
+        applyFontSettings(cancel, 14);
         cancel.setOnClickListener(v -> dialog.dismiss());
         btnLayout.addView(cancel);
 
         Button print = new Button(this);
         print.setText("Print");
+        applyFontSettings(print, 14);
         print.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.BLACK));
         print.setTextColor(Color.WHITE);
         print.setOnClickListener(v -> {
@@ -330,6 +390,7 @@ public class SecureBoxActivity extends AppCompatActivity {
 
         Button save = new Button(this);
         save.setText("Save");
+        applyFontSettings(save, 14);
         save.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.BLACK));
         save.setTextColor(Color.WHITE);
         save.setOnClickListener(v -> {

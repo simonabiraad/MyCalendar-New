@@ -11,6 +11,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
@@ -89,6 +90,7 @@ public class MainActivity extends AppCompatActivity {
     private SharedPreferences reminderPreferences;
     private SharedPreferences securityPrefs;
     private SharedPreferences colorPrefs;
+    private SharedPreferences fontPrefs;
     private CalendarAdapter adapter;
 
     private String lastDeletedNote;
@@ -173,6 +175,7 @@ public class MainActivity extends AppCompatActivity {
         reminderPreferences = getSharedPreferences("ReminderStatus", Context.MODE_PRIVATE);
         securityPrefs = getSharedPreferences("SecuritySettings", Context.MODE_PRIVATE);
         colorPrefs = getSharedPreferences("AppColors", Context.MODE_PRIVATE);
+        fontPrefs = getSharedPreferences("AppFonts", Context.MODE_PRIVATE);
 
         // Hide folders initially
         archiveHistoryContainer.setVisibility(View.GONE);
@@ -230,6 +233,7 @@ public class MainActivity extends AppCompatActivity {
             popup.getMenu().add("Change Password");
             popup.getMenu().add("Notification Settings");
             popup.getMenu().add("Change Colors");
+            popup.getMenu().add("Font");
             popup.getMenu().add("Print");
             popup.getMenu().add("About");
             popup.getMenu().add("Exit");
@@ -250,6 +254,8 @@ public class MainActivity extends AppCompatActivity {
                     findViewById(R.id.notificationSettingsButton).performClick();
                 } else if (title.equals("Change Colors")) {
                     showChangeColorsDialog();
+                } else if (title.equals("Font")) {
+                    showFontDialog();
                 } else if (title.equals("Print")) {
                     showPrintDialog();
                 } else if (title.equals("About")) {
@@ -449,6 +455,7 @@ public class MainActivity extends AppCompatActivity {
         } else {
             TextView noRemarks = new TextView(this);
             noRemarks.setText(getString(R.string.no_notes_day));
+            applyFontSettings(noRemarks, 16);
             noRemarks.setTextColor(Color.WHITE);
             dayRemarksContainer.addView(noRemarks);
         }
@@ -667,6 +674,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView createRemarkTextView(String remarkText, int index, SharedPreferences sourcePrefs) {
         TextView textView = new TextView(this);
         textView.setText(remarkText);
+        applyFontSettings(textView, 16);
         if (remarkText.startsWith("▣ ")) {
             textView.setTextColor(colorPrefs.getInt("color_note_checked", Color.GREEN));
         } else {
@@ -1092,6 +1100,7 @@ public class MainActivity extends AppCompatActivity {
 
         final Button dateButton = new Button(this);
         dateButton.setText("Date: " + sdf.format(noteDate.getTime()));
+        applyFontSettings(dateButton, 14);
         dateButton.setBackgroundTintList(ColorStateList.valueOf(colorPrefs.getInt("color_main_theme", getColor(R.color.light_green))));
         dateButton.setTextColor(Color.WHITE);
         dateButton.setOnClickListener(v -> {
@@ -1105,6 +1114,7 @@ public class MainActivity extends AppCompatActivity {
         final EditText input = new EditText(this);
         input.setHint("Enter note here...");
         input.setText(initialText);
+        applyFontSettings(input, 18);
         input.setTextColor(Color.WHITE);
         input.setHintTextColor(Color.GRAY);
         layout.addView(input);
@@ -1158,11 +1168,12 @@ public class MainActivity extends AppCompatActivity {
             String countText = getString(R.string.all_personal_notes) + " (" + activeCount + ")";
             activeTitle.setText(countText);
             activeTitle.setTextColor(mainTheme);
+            applyFontSettings(activeTitle, 18);
         }
         loadHistoryFromPrefs(sharedPreferences, remarkHistoryContainer, R.string.no_notes_saved, mainTheme);
         Button archiveBtn = new Button(this);
         archiveBtn.setText(R.string.archive_all_past_notes);
-        archiveBtn.setTextSize(12);
+        applyFontSettings(archiveBtn, 12);
         archiveBtn.setBackgroundTintList(ColorStateList.valueOf(mainTheme));
         archiveBtn.setTextColor(Color.WHITE);
         archiveBtn.setOnClickListener(v -> archiveAllPastNotes());
@@ -1173,6 +1184,7 @@ public class MainActivity extends AppCompatActivity {
             String countText = getString(R.string.archive_folder) + " (" + archiveCount + ")";
             archiveTitle.setText(countText);
             archiveTitle.setTextColor(archiveColor);
+            applyFontSettings(archiveTitle, 18);
         }
         loadHistoryFromPrefs(archivePreferences, archiveHistoryContainer, R.string.no_archived_notes, archiveColor);
         int deletedCount = countTotalNotes(deletedPreferences);
@@ -1181,11 +1193,12 @@ public class MainActivity extends AppCompatActivity {
             String countText = getString(R.string.deleted_notes_title) + " (" + deletedCount + ")";
             deletedTitle.setText(countText);
             deletedTitle.setTextColor(deletedColor);
+            applyFontSettings(deletedTitle, 18);
         }
         loadHistoryFromPrefs(deletedPreferences, deletedHistoryContainer, R.string.no_deleted_notes, deletedColor);
         Button clearTrashBtn = new Button(this);
         clearTrashBtn.setText(R.string.clear_trash_btn);
-        clearTrashBtn.setTextSize(10);
+        applyFontSettings(clearTrashBtn, 10);
         clearTrashBtn.setBackgroundTintList(ColorStateList.valueOf(deletedColor));
         clearTrashBtn.setTextColor(Color.WHITE);
         clearTrashBtn.setOnClickListener(v -> new AlertDialog.Builder(MainActivity.this)
@@ -1280,8 +1293,8 @@ public class MainActivity extends AppCompatActivity {
             TextView dateHeader = new TextView(this);
             String label = Objects.equals(dateKey, todayKey) ? "TODAY: " + dateKey : "Date: " + dateKey;
             dateHeader.setText(label);
+            applyFontSettings(dateHeader, 13);
             dateHeader.setTextColor(dateColor);
-            dateHeader.setTextSize(13);
             dateHeader.setPadding(0, 16, 0, 4);
             dateHeader.setOnClickListener(v -> jumpToDate(dateKey, sdf));
             container.addView(dateHeader);
@@ -1294,6 +1307,7 @@ public class MainActivity extends AppCompatActivity {
                 noteLayout.setPadding(32, 4, 0, 4);
                 TextView tv = new TextView(this);
                 tv.setText(noteText);
+                applyFontSettings(tv, 14);
                 if (noteText.startsWith("▣ ")) {
                     tv.setTextColor(colorPrefs.getInt("color_note_checked", Color.GREEN));
                 } else if (container == deletedHistoryContainer) {
@@ -1301,7 +1315,6 @@ public class MainActivity extends AppCompatActivity {
                 } else {
                     tv.setTextColor(colorPrefs.getInt("color_note_text", Color.WHITE));
                 }
-                tv.setTextSize(14);
                 tv.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
                 noteLayout.addView(tv);
                 int iconSize = (int) (28 * getResources().getDisplayMetrics().density);
@@ -1498,6 +1511,79 @@ public class MainActivity extends AppCompatActivity {
         Toast.makeText(this, "Colors reset to default", Toast.LENGTH_SHORT).show();
     }
 
+    private void showFontDialog() {
+        String[] options = {"Font Style", "Font Size", "Reset Font Settings"};
+        new AlertDialog.Builder(this)
+                .setTitle("Font Settings")
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) {
+                        showFontStylePicker();
+                    } else if (which == 1) {
+                        showFontSizePicker();
+                    } else {
+                        resetFontSettings();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showFontStylePicker() {
+        String[] fontNames = {"Default", "Sans Serif", "Serif", "Monospace"};
+        new AlertDialog.Builder(this)
+                .setTitle("Select Font Style")
+                .setItems(fontNames, (dialog, which) -> {
+                    fontPrefs.edit().putInt("font_style", which).apply();
+                    refreshUI();
+                    Toast.makeText(this, "Font style updated!", Toast.LENGTH_SHORT).show();
+                })
+                .show();
+    }
+
+    private void showFontSizePicker() {
+        String[] sizeNames = {"Small", "Normal", "Large", "Extra Large"};
+        new AlertDialog.Builder(this)
+                .setTitle("Select Font Size")
+                .setItems(sizeNames, (dialog, which) -> {
+                    fontPrefs.edit().putInt("font_size_index", which).apply();
+                    refreshUI();
+                    Toast.makeText(this, "Font size updated!", Toast.LENGTH_SHORT).show();
+                })
+                .show();
+    }
+
+    private void resetFontSettings() {
+        fontPrefs.edit().clear().apply();
+        refreshUI();
+        Toast.makeText(this, "Font settings reset", Toast.LENGTH_SHORT).show();
+    }
+
+    private void refreshUI() {
+        refreshUIColors();
+        // Fonts are refreshed inside individual component loaders and in adapter
+    }
+
+    private void applyFontSettings(TextView textView, float baseSize) {
+        int styleIndex = fontPrefs.getInt("font_style", 0);
+        Typeface tf = Typeface.DEFAULT;
+        switch (styleIndex) {
+            case 1: tf = Typeface.SANS_SERIF; break;
+            case 2: tf = Typeface.SERIF; break;
+            case 3: tf = Typeface.MONOSPACE; break;
+        }
+        textView.setTypeface(tf);
+
+        int sizeIndex = fontPrefs.getInt("font_size_index", 1); // Default to Normal
+        float multiplier = 1.0f;
+        switch (sizeIndex) {
+            case 0: multiplier = 0.8f; break;
+            case 1: multiplier = 1.0f; break;
+            case 2: multiplier = 1.3f; break;
+            case 3: multiplier = 1.6f; break;
+        }
+        textView.setTextSize(baseSize * multiplier);
+    }
+
     private void refreshUIColors() {
         int mainTheme = colorPrefs.getInt("color_main_theme", getColor(R.color.light_green));
         int noteText = colorPrefs.getInt("color_note_text", Color.WHITE);
@@ -1512,26 +1598,65 @@ public class MainActivity extends AppCompatActivity {
 
         // Header
         TextView title = findViewById(R.id.titleTextView);
-        if (title != null) title.setTextColor(mainTheme);
+        if (title != null) {
+            title.setTextColor(mainTheme);
+            applyFontSettings(title, 22);
+        }
         TextView clock = findViewById(R.id.textClockDate);
-        if (clock != null) clock.setTextColor(mainTheme);
+        if (clock != null) {
+            clock.setTextColor(mainTheme);
+            applyFontSettings(clock, 14);
+        }
         TextView remarkLbl = findViewById(R.id.remarkLabel);
-        if (remarkLbl != null) remarkLbl.setTextColor(mainTheme);
+        if (remarkLbl != null) {
+            remarkLbl.setTextColor(mainTheme);
+            applyFontSettings(remarkLbl, 18);
+        }
+        TextView monthYear = findViewById(R.id.monthYearText);
+        if (monthYear != null) {
+            applyFontSettings(monthYear, 16);
+        }
+
+        // Weekday labels
+        ViewGroup weekdayLayout = findViewById(R.id.weekdayLayout);
+        if (weekdayLayout != null) {
+            for (int i = 0; i < weekdayLayout.getChildCount(); i++) {
+                View child = weekdayLayout.getChildAt(i);
+                if (child instanceof TextView) {
+                    applyFontSettings((TextView) child, 11);
+                }
+            }
+        }
+
+        // Input
+        EditText input = findViewById(R.id.noteInput);
+        if (input != null) {
+            applyFontSettings(input, 14);
+        }
 
         // Buttons
-        View saveBtn = findViewById(R.id.saveNoteButton);
-        if (saveBtn != null) saveBtn.setBackgroundTintList(ColorStateList.valueOf(mainTheme));
-        View secureBtn = findViewById(R.id.secureBoxButton);
-        if (secureBtn != null) secureBtn.setBackgroundTintList(ColorStateList.valueOf(mainTheme));
-        View notifyBtn = findViewById(R.id.notificationSettingsButton);
-        if (notifyBtn != null) notifyBtn.setBackgroundTintList(ColorStateList.valueOf(mainTheme));
+        Button saveBtn = findViewById(R.id.saveNoteButton);
+        if (saveBtn != null) {
+            saveBtn.setBackgroundTintList(ColorStateList.valueOf(mainTheme));
+            applyFontSettings(saveBtn, 11);
+        }
+        Button secureBtn = findViewById(R.id.secureBoxButton);
+        if (secureBtn != null) {
+            secureBtn.setBackgroundTintList(ColorStateList.valueOf(mainTheme));
+            applyFontSettings(secureBtn, 11);
+        }
+        Button notifyBtn = findViewById(R.id.notificationSettingsButton);
+        if (notifyBtn != null) {
+            notifyBtn.setBackgroundTintList(ColorStateList.valueOf(mainTheme));
+            applyFontSettings(notifyBtn, 11);
+        }
         ImageButton menuBtn = findViewById(R.id.mainMenuButton);
         if (menuBtn != null) menuBtn.setImageTintList(ColorStateList.valueOf(mainTheme));
         ImageButton voiceBtn = findViewById(R.id.voiceNoteButton);
         if (voiceBtn != null) voiceBtn.setImageTintList(ColorStateList.valueOf(mainTheme));
 
         // History
-        updateRemarkHistory(); // This will use the new colors during redraw
+        updateRemarkHistory(); // This will use the new colors/fonts during redraw
         loadRemarksForSelectedDate();
         if (adapter != null) adapter.notifyDataSetChanged();
     }
@@ -1647,6 +1772,7 @@ public class MainActivity extends AppCompatActivity {
             }
 
             TextView dayText = itemView.findViewById(R.id.dayNumber);
+            applyFontSettings(dayText, 14);
             ImageView flag = itemView.findViewById(R.id.noteFlag);
 
             Date date = days.get(position);
