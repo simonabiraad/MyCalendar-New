@@ -14,6 +14,7 @@ import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.speech.RecognizerIntent;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -76,6 +77,7 @@ public class MainActivity extends AppCompatActivity {
     private Calendar calendar;
     private Calendar selectedDate;
     private String currentDateKey;
+    private EditText currentDialogInput;
     private SharedPreferences sharedPreferences;
     private SharedPreferences archivePreferences;
     private SharedPreferences deletedPreferences;
@@ -86,6 +88,25 @@ public class MainActivity extends AppCompatActivity {
     private String lastDeletedNote;
     private int lastDeletedIndex;
     private String lastDeletedDateKey;
+
+    private final ActivityResultLauncher<Intent> voiceRecognitionLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                    ArrayList<String> matches = result.getData().getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                    if (matches != null && !matches.isEmpty()) {
+                        String spokenText = matches.get(0);
+                        if (currentDialogInput != null) {
+                            String existingText = currentDialogInput.getText().toString();
+                            currentDialogInput.setText(existingText.isEmpty() ? spokenText : existingText + " " + spokenText);
+                        } else if (noteInput.hasFocus()) {
+                            String existingText = noteInput.getText().toString();
+                            noteInput.setText(existingText.isEmpty() ? spokenText : existingText + " " + spokenText);
+                        } else {
+                            showNewNoteDialog(spokenText);
+                        }
+                    }
+                }
+            });
 
     private final ActivityResultLauncher<String> requestPermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
@@ -187,8 +208,15 @@ public class MainActivity extends AppCompatActivity {
         
         saveNoteButton.setOnClickListener(v -> saveNote());
 
+        findViewById(R.id.voiceNoteButton).setOnClickListener(v -> {
+            noteInput.requestFocus();
+            startVoiceRecognition();
+        });
+
         findViewById(R.id.mainMenuButton).setOnClickListener(v -> {
             android.widget.PopupMenu popup = new android.widget.PopupMenu(this, v);
+            popup.getMenu().add("New Note");
+            popup.getMenu().add("Voice Note");
             popup.getMenu().add("Secure Box");
             popup.getMenu().add("Change Password");
             popup.getMenu().add("Notification Settings");
@@ -197,7 +225,13 @@ public class MainActivity extends AppCompatActivity {
 
             popup.setOnMenuItemClickListener(item -> {
                 String title = item.getTitle().toString();
-                if (title.equals("Secure Box")) {
+                if (title.equals("New Note")) {
+                    currentDialogInput = null;
+                    showNewNoteDialog("");
+                } else if (title.equals("Voice Note")) {
+                    currentDialogInput = null;
+                    startVoiceRecognition();
+                } else if (title.equals("Secure Box")) {
                     findViewById(R.id.secureBoxButton).performClick();
                 } else if (title.equals("Change Password")) {
                     showChangePasswordDialog();
@@ -994,24 +1028,104 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "Please enter a note", Toast.LENGTH_SHORT).show();
             return;
         }
-        String entry = "□ " + newText;
+        saveNoteForDate(currentDateKey, newText);
+        noteInput.setText("");
+    }
+
+    private void saveNoteForDate(String dateKey, String noteText) {
+        String entry = "□ " + noteText;
         SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
         String todayKey = sdf.format(Calendar.getInstance().getTime());
         SharedPreferences targetPrefs = sharedPreferences;
         try {
-            Date selected = sdf.parse(currentDateKey);
+            Date selected = sdf.parse(dateKey);
             Date today = sdf.parse(todayKey);
             if (selected != null && today != null && selected.before(today)) targetPrefs = archivePreferences;
         } catch (Exception ignored) {}
-        String existingRemarks = targetPrefs.getString(currentDateKey, "");
+        String existingRemarks = targetPrefs.getString(dateKey, "");
         String updatedRemarks = existingRemarks.isEmpty() ? entry : existingRemarks + "\n" + entry;
-        targetPrefs.edit().putString(currentDateKey, updatedRemarks).apply();
-        loadRemarksForSelectedDate();
-        noteInput.setText("");
+        targetPrefs.edit().putString(dateKey, updatedRemarks).apply();
+        if (Objects.equals(dateKey, currentDateKey)) loadRemarksForSelectedDate();
         updateRemarkHistory();
         adapter.notifyDataSetChanged();
         updateAllWidgets();
         Toast.makeText(this, "Note added!", Toast.LENGTH_SHORT).show();
+    }
+
+    private void startVoiceRecognition() {
+        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
+        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak your note...");
+        try {
+            voiceRecognitionLauncher.launch(intent);
+        } catch (Exception e) {
+            Toast.makeText(this, "Voice recognition not supported", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void showNewNoteDialog(String initialText) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("New Note");
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(50, 40, 50, 10);
+
+        final Calendar noteDate = Calendar.getInstance();
+        final SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
+
+        final Button dateButton = new Button(this);
+        dateButton.setText("Date: " + sdf.format(noteDate.getTime()));
+        dateButton.setBackgroundTintList(ColorStateList.valueOf(getColor(R.color.light_green)));
+        dateButton.setTextColor(Color.WHITE);
+        dateButton.setOnClickListener(v -> {
+            new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+                noteDate.set(year, month, dayOfMonth);
+                dateButton.setText("Date: " + sdf.format(noteDate.getTime()));
+            }, noteDate.get(Calendar.YEAR), noteDate.get(Calendar.MONTH), noteDate.get(Calendar.DAY_OF_MONTH)).show();
+        });
+        layout.addView(dateButton);
+
+        final EditText input = new EditText(this);
+        input.setHint("Enter note here...");
+        input.setText(initialText);
+        input.setTextColor(Color.WHITE);
+        input.setHintTextColor(Color.GRAY);
+        layout.addView(input);
+
+        final ImageButton voiceBtn = new ImageButton(this);
+        voiceBtn.setImageResource(android.R.drawable.ic_btn_speak_now);
+        voiceBtn.setBackgroundColor(Color.TRANSPARENT);
+        voiceBtn.setOnClickListener(v -> {
+            currentDialogInput = input;
+            Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
+            intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak your note...");
+            try {
+                voiceRecognitionLauncher.launch(intent);
+            } catch (Exception e) {
+                Toast.makeText(this, "Voice recognition not supported", Toast.LENGTH_SHORT).show();
+            }
+        });
+        layout.addView(voiceBtn);
+
+        builder.setView(layout);
+        builder.setPositiveButton("Save", (dialog, which) -> {
+            currentDialogInput = null;
+            String text = input.getText().toString().trim();
+            if (!text.isEmpty()) {
+                saveNoteForDate(sdf.format(noteDate.getTime()), text);
+            } else {
+                Toast.makeText(this, "Note cannot be empty", Toast.LENGTH_SHORT).show();
+            }
+        });
+        builder.setNegativeButton("Cancel", (dialog, which) -> {
+            currentDialogInput = null;
+            dialog.cancel();
+        });
+        builder.show();
     }
 
     private void updateRemarkHistory() {
@@ -1285,7 +1399,10 @@ public class MainActivity extends AppCompatActivity {
                 Toast.makeText(this, "Password cannot be empty", Toast.LENGTH_SHORT).show();
             }
         });
-        builder.setNegativeButton("Cancel", null);
+        builder.setNegativeButton("Cancel", (dialog, which) -> {
+            currentDialogInput = null;
+            dialog.cancel();
+        });
         builder.show();
     }
 

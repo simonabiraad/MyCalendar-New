@@ -153,20 +153,38 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/remarkLabel" />
 
-            <EditText
-                android:id="@+id/noteInput"
+            <LinearLayout
+                android:id="@+id/noteInputContainer"
                 android:layout_width="0dp"
-                android:layout_height="36dp"
+                android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:autofillHints="none"
-                android:hint="@string/note_hint"
-                android:inputType="textMultiLine"
-                android:textColor="@color/white"
-                android:textColorHint="@color/white"
-                android:textSize="14sp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/dayRemarksContainer" />
+                app:layout_constraintTop_toBottomOf="@id/dayRemarksContainer">
+
+                <ImageButton
+                    android:id="@+id/voiceNoteButton"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Voice Note"
+                    android:src="@android:drawable/ic_btn_speak_now"
+                    app:tint="@color/light_green" />
+
+                <EditText
+                    android:id="@+id/noteInput"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_weight="1"
+                    android:autofillHints="none"
+                    android:hint="@string/note_hint"
+                    android:inputType="textMultiLine"
+                    android:textColor="@color/white"
+                    android:textColorHint="@color/white"
+                    android:textSize="14sp" />
+            </LinearLayout>
 
             <LinearLayout
                 android:id="@+id/buttonContainer"
@@ -175,7 +193,7 @@
                 android:layout_marginTop="4dp"
                 android:orientation="horizontal"
                 app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/noteInput">
+                app:layout_constraintTop_toBottomOf="@id/noteInputContainer">
 
                 <Button
                     android:id="@+id/secureBoxButton"
