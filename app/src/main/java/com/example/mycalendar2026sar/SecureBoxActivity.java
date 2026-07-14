@@ -26,24 +26,29 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.activity.EdgeToEdge;
+import androidx.appcompat.app.AlertDialog;
 
 import com.google.android.material.card.MaterialCardView;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 public class SecureBoxActivity extends AppCompatActivity {
 
-    private LinearLayout personalNotesSection, passwordNotesSection, familyNotesSection, workNotesSection;
-    private GridLayout personalNotesContainer, passwordNotesContainer, familyNotesContainer, workNotesContainer;
-    private EditText personalNoteInput, passwordNoteInput, familyNoteInput, workNoteInput;
-    private ScrollView personalScrollView, passwordScrollView, familyScrollView, workScrollView;
-    private SharedPreferences securePrefs, colorPrefs, fontPrefs;
-    private static final String PERSONAL_KEY = "personal_notes";
-    private static final String PASSWORD_KEY = "password_notes";
-    private static final String FAMILY_KEY = "family_notes";
-    private static final String WORK_KEY = "work_notes";
+    private LinearLayout notesSection;
+    private GridLayout notesContainer;
+    private EditText noteTitleInput, noteContentInput;
+    private ScrollView notesScrollView;
+    private LinearLayout buttonContainer;
+    private SharedPreferences securePrefs, colorPrefs, fontPrefs, categoryPrefs;
+    
+    private String activeCategoryKey = "";
+    private int activeCategoryColor = 0;
+
     private static final String SEPARATOR = "###NOTE_SEP###";
+    private static final String TITLE_SEP = "###TITLE_SEP###";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,218 +62,274 @@ public class SecureBoxActivity extends AppCompatActivity {
             return insets;
         });
 
-        personalNotesSection = findViewById(R.id.personalNotesSection);
-        personalNotesContainer = findViewById(R.id.personalNotesContainer);
-        personalNoteInput = findViewById(R.id.personalNoteInput);
-        personalScrollView = findViewById(R.id.personalScrollView);
-
-        passwordNotesSection = findViewById(R.id.passwordNotesSection);
-        passwordNotesContainer = findViewById(R.id.passwordNotesContainer);
-        passwordNoteInput = findViewById(R.id.passwordNoteInput);
-        passwordScrollView = findViewById(R.id.passwordScrollView);
-
-        familyNotesSection = findViewById(R.id.familyNotesSection);
-        familyNotesContainer = findViewById(R.id.familyNotesContainer);
-        familyNoteInput = findViewById(R.id.familyNoteInput);
-        familyScrollView = findViewById(R.id.familyScrollView);
-
-        workNotesSection = findViewById(R.id.workNotesSection);
-        workNotesContainer = findViewById(R.id.workNotesContainer);
-        workNoteInput = findViewById(R.id.workNoteInput);
-        workScrollView = findViewById(R.id.workScrollView);
-
-        Button personalButton = findViewById(R.id.personalButton);
-        Button passwordButton = findViewById(R.id.passwordButton);
-        Button familyButton = findViewById(R.id.familyButton);
-        Button workButton = findViewById(R.id.workButton);
-
-        Button savePersonalBtn = findViewById(R.id.savePersonalNoteButton);
-        Button savePasswordBtn = findViewById(R.id.savePasswordNoteButton);
-        Button saveFamilyBtn = findViewById(R.id.saveFamilyNoteButton);
-        Button saveWorkBtn = findViewById(R.id.saveWorkNoteButton);
-
-        securePrefs = getSharedPreferences("SecureBoxNotes", Context.MODE_PRIVATE);
         colorPrefs = getSharedPreferences("AppColors", Context.MODE_PRIVATE);
+        securePrefs = getSharedPreferences("SecureBoxNotes", Context.MODE_PRIVATE);
         fontPrefs = getSharedPreferences("AppFonts", Context.MODE_PRIVATE);
+        categoryPrefs = getSharedPreferences("SecureBoxCategories", Context.MODE_PRIVATE);
 
+        initViews();
+        loadCategories();
         refreshColors();
-
-        personalButton.setOnClickListener(v -> toggleSection(personalNotesSection, PERSONAL_KEY, personalNotesContainer));
-        passwordButton.setOnClickListener(v -> toggleSection(passwordNotesSection, PASSWORD_KEY, passwordNotesContainer));
-        familyButton.setOnClickListener(v -> toggleSection(familyNotesSection, FAMILY_KEY, familyNotesContainer));
-        workButton.setOnClickListener(v -> toggleSection(workNotesSection, WORK_KEY, workNotesContainer));
-
-        savePersonalBtn.setOnClickListener(v -> saveNote(PERSONAL_KEY, personalNoteInput, personalNotesContainer, personalScrollView));
-        savePasswordBtn.setOnClickListener(v -> saveNote(PASSWORD_KEY, passwordNoteInput, passwordNotesContainer, passwordScrollView));
-        saveFamilyBtn.setOnClickListener(v -> saveNote(FAMILY_KEY, familyNoteInput, familyNotesContainer, familyScrollView));
-        saveWorkBtn.setOnClickListener(v -> saveNote(WORK_KEY, workNoteInput, workNotesContainer, workScrollView));
-
         setupAutoScroll();
+
+        String action = getIntent().getStringExtra("action");
+        if ("new_note".equals(action)) {
+            // Default to Personal if coming from "New Sticky Note" shortcut
+            selectCategory("personal_notes", colorPrefs.getInt("color_sb_personal", getColor(R.color.light_green)));
+            noteTitleInput.requestFocus();
+        }
     }
 
-    private void refreshColors() {
-        int personalColor = colorPrefs.getInt("color_sb_personal", getColor(R.color.light_green));
-        int passwordColor = colorPrefs.getInt("color_sb_password", getColor(R.color.unmellow_yellow));
-        int familyColor = colorPrefs.getInt("color_sb_family", getColor(R.color.blue));
-        int workColor = colorPrefs.getInt("color_sb_work", getColor(R.color.honey));
-        int mainTheme = colorPrefs.getInt("color_main_theme", getColor(R.color.light_green));
-        int bgColor = colorPrefs.getInt("color_app_background", Color.BLACK);
+    private void initViews() {
+        notesSection = findViewById(R.id.notesSection);
+        notesContainer = findViewById(R.id.notesContainer);
+        noteTitleInput = findViewById(R.id.noteTitleInput);
+        noteContentInput = findViewById(R.id.noteContentInput);
+        notesScrollView = findViewById(R.id.notesScrollView);
+        buttonContainer = findViewById(R.id.buttonContainer);
 
-        View root = findViewById(R.id.main);
-        if (root != null) root.setBackgroundColor(bgColor);
-
-        TextView title = findViewById(R.id.secureBoxTitle);
-        if (title != null) {
-            title.setTextColor(mainTheme);
-            applyFontSettings(title, 24);
-        }
-
-        Button personalBtn = findViewById(R.id.personalButton);
-        if (personalBtn != null) {
-            personalBtn.setBackgroundTintList(android.content.res.ColorStateList.valueOf(personalColor));
-            applyFontSettings(personalBtn, 10);
-        }
-        Button passwordBtn = findViewById(R.id.passwordButton);
-        if (passwordBtn != null) {
-            passwordBtn.setBackgroundTintList(android.content.res.ColorStateList.valueOf(passwordColor));
-            applyFontSettings(passwordBtn, 10);
-        }
-        Button familyBtn = findViewById(R.id.familyButton);
-        if (familyBtn != null) {
-            familyBtn.setBackgroundTintList(android.content.res.ColorStateList.valueOf(familyColor));
-            applyFontSettings(familyBtn, 10);
-        }
-        Button workBtn = findViewById(R.id.workButton);
-        if (workBtn != null) {
-            workBtn.setBackgroundTintList(android.content.res.ColorStateList.valueOf(workColor));
-            applyFontSettings(workBtn, 10);
-        }
-
-        Button savePersonal = findViewById(R.id.savePersonalNoteButton);
-        if (savePersonal != null) {
-            savePersonal.setBackgroundTintList(android.content.res.ColorStateList.valueOf(personalColor));
-            applyFontSettings(savePersonal, 14);
-        }
-        Button savePassword = findViewById(R.id.savePasswordNoteButton);
-        if (savePassword != null) {
-            savePassword.setBackgroundTintList(android.content.res.ColorStateList.valueOf(passwordColor));
-            applyFontSettings(savePassword, 14);
-        }
-        Button saveFamily = findViewById(R.id.saveFamilyNoteButton);
-        if (saveFamily != null) {
-            saveFamily.setBackgroundTintList(android.content.res.ColorStateList.valueOf(familyColor));
-            applyFontSettings(saveFamily, 14);
-        }
-        Button saveWork = findViewById(R.id.saveWorkNoteButton);
-        if (saveWork != null) {
-            saveWork.setBackgroundTintList(android.content.res.ColorStateList.valueOf(workColor));
-            applyFontSettings(saveWork, 14);
-        }
-
-        // Apply to inputs
-        if (personalNoteInput != null) applyFontSettings(personalNoteInput, 18);
-        if (passwordNoteInput != null) applyFontSettings(passwordNoteInput, 18);
-        if (familyNoteInput != null) applyFontSettings(familyNoteInput, 18);
-        if (workNoteInput != null) applyFontSettings(workNoteInput, 18);
+        findViewById(R.id.saveStickyNoteButton).setOnClickListener(v -> saveNote());
+        findViewById(R.id.addCategoryButton).setOnClickListener(v -> showAddCategoryDialog());
     }
 
-    private void applyFontSettings(TextView textView, float baseSize) {
-        int styleIndex = fontPrefs.getInt("font_style", 0);
-        Typeface tf = Typeface.DEFAULT;
-        switch (styleIndex) {
-            case 1: tf = Typeface.SANS_SERIF; break;
-            case 2: tf = Typeface.SERIF; break;
-            case 3: tf = Typeface.MONOSPACE; break;
-        }
-        textView.setTypeface(tf);
-
-        int sizeIndex = fontPrefs.getInt("font_size_index", 1);
-        float multiplier = 1.0f;
-        switch (sizeIndex) {
-            case 0: multiplier = 0.8f; break;
-            case 1: multiplier = 1.0f; break;
-            case 2: multiplier = 1.3f; break;
-            case 3: multiplier = 1.6f; break;
-        }
-        textView.setTextSize(baseSize * multiplier);
-    }
-
-    private void setupAutoScroll() {
-        View.OnFocusChangeListener scrollListener = (v, hasFocus) -> {
-            if (hasFocus) {
-                final ScrollView activeScrollView;
-                if (v == personalNoteInput) activeScrollView = personalScrollView;
-                else if (v == passwordNoteInput) activeScrollView = passwordScrollView;
-                else if (v == familyNoteInput) activeScrollView = familyScrollView;
-                else if (v == workNoteInput) activeScrollView = workScrollView;
-                else activeScrollView = null;
-
-                if (activeScrollView != null) {
-                    activeScrollView.postDelayed(() -> activeScrollView.fullScroll(View.FOCUS_DOWN), 300);
-                }
-            }
-        };
-
-        personalNoteInput.setOnFocusChangeListener(scrollListener);
-        passwordNoteInput.setOnFocusChangeListener(scrollListener);
-        familyNoteInput.setOnFocusChangeListener(scrollListener);
-        workNoteInput.setOnFocusChangeListener(scrollListener);
+    private void loadCategories() {
+        // Clear except the + button
+        View addButton = findViewById(R.id.addCategoryButton);
+        buttonContainer.removeAllViews();
         
-        // Also scroll when clicking
-        View.OnClickListener clickListener = v -> {
-            final ScrollView activeScrollView;
-            if (v == personalNoteInput) activeScrollView = personalScrollView;
-            else if (v == passwordNoteInput) activeScrollView = passwordScrollView;
-            else if (v == familyNoteInput) activeScrollView = familyScrollView;
-            else if (v == workNoteInput) activeScrollView = workScrollView;
-            else activeScrollView = null;
+        // Add default categories if not exists
+        if (categoryPrefs.getAll().isEmpty()) {
+            categoryPrefs.edit()
+                    .putString("personal_notes", "Personal")
+                    .putString("password_notes", "Password")
+                    .putString("family_notes", "Family")
+                    .putString("work_notes", "Work")
+                    .putString("others_notes", "Others")
+                    .putString("cats_order", "personal_notes,password_notes,family_notes,work_notes,others_notes")
+                    .apply();
+        }
 
-            if (activeScrollView != null) {
-                activeScrollView.postDelayed(() -> activeScrollView.fullScroll(View.FOCUS_DOWN), 300);
+        String orderStr = categoryPrefs.getString("cats_order", "");
+        if (orderStr.isEmpty()) {
+            Map<String, ?> all = categoryPrefs.getAll();
+            List<String> keys = new ArrayList<>();
+            for (String k : all.keySet()) {
+                if (!k.equals("cats_order")) keys.add(k);
             }
-        };
+            orderStr = String.join(",", keys);
+        }
+
+        String[] order = orderStr.split(",");
+        for (String key : order) {
+            String name = categoryPrefs.getString(key, null);
+            if (name != null) {
+                addCategoryButtonToUI(key, name);
+            }
+        }
         
-        personalNoteInput.setOnClickListener(clickListener);
-        passwordNoteInput.setOnClickListener(clickListener);
-        familyNoteInput.setOnClickListener(clickListener);
-        workNoteInput.setOnClickListener(clickListener);
+        buttonContainer.addView(addButton);
     }
 
-    private void toggleSection(LinearLayout section, String key, GridLayout container) {
-        boolean wasVisible = section.getVisibility() == View.VISIBLE;
-        hideAllSections();
-        if (!wasVisible) {
-            section.setVisibility(View.VISIBLE);
-            loadNotes(key, container);
+    private void addCategoryButtonToUI(String key, String name) {
+        Button btn = new Button(this);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, 0, 8, 0);
+        btn.setLayoutParams(params);
+        btn.setText(name);
+        btn.setAllCaps(false);
+        btn.setPadding(24, 0, 24, 0);
+        btn.setTextColor(Color.WHITE);
+        applyFontSettings(btn, 10);
+
+        int defaultColor;
+        if (key.equals("personal_notes")) defaultColor = getColor(R.color.light_green);
+        else if (key.equals("password_notes")) { defaultColor = getColor(R.color.unmellow_yellow); btn.setTextColor(Color.BLACK); }
+        else if (key.equals("family_notes")) defaultColor = getColor(R.color.blue);
+        else if (key.equals("work_notes")) defaultColor = getColor(R.color.honey);
+        else if (key.equals("others_notes")) defaultColor = getColor(R.color.teal_200);
+        else defaultColor = colorPrefs.getInt("color_cat_" + key, Color.GRAY);
+
+        int color = colorPrefs.getInt("color_sb_" + key.replace("_notes", ""), defaultColor);
+        btn.setBackgroundTintList(android.content.res.ColorStateList.valueOf(color));
+
+        btn.setOnClickListener(v -> selectCategory(key, color));
+        
+        btn.setOnLongClickListener(v -> {
+            showCategoryOptionsDialog(key, btn);
+            return true;
+        });
+
+        buttonContainer.addView(btn);
+    }
+
+    private void selectCategory(String key, int color) {
+        activeCategoryKey = key;
+        activeCategoryColor = color;
+        notesSection.setVisibility(View.VISIBLE);
+        
+        // Update Save Button color to match category
+        findViewById(R.id.saveStickyNoteButton).setBackgroundTintList(android.content.res.ColorStateList.valueOf(color));
+        if (color == getColor(R.color.unmellow_yellow)) {
+            ((Button)findViewById(R.id.saveStickyNoteButton)).setTextColor(Color.BLACK);
+        } else {
+            ((Button)findViewById(R.id.saveStickyNoteButton)).setTextColor(Color.WHITE);
+        }
+
+        loadNotes(key);
+    }
+
+    private void showAddCategoryDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("New Category");
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(50, 40, 50, 10);
+
+        final EditText nameInput = new EditText(this);
+        nameInput.setHint("Category Name");
+        layout.addView(nameInput);
+
+        builder.setView(layout);
+        builder.setPositiveButton("Next: Choose Color", (dialog, which) -> {
+            String name = nameInput.getText().toString().trim();
+            if (!name.isEmpty()) {
+                showColorPickerForCategory(name);
+            }
+        });
+        builder.setNegativeButton("Cancel", null);
+        builder.show();
+    }
+
+    private void showColorPickerForCategory(String name) {
+        String[] colorNames = {"Green", "Blue", "Red", "Orange", "Purple", "Teal", "Grey", "Pink"};
+        int[] colorValues = {0xFF4CAF50, 0xFF2196F3, 0xFFF44336, 0xFFFF9800, 0xFF9C27B0, 0xFF009688, 0xFF9E9E9E, 0xFFE91E63};
+
+        new AlertDialog.Builder(this)
+                .setTitle("Pick Color for " + name)
+                .setItems(colorNames, (dialog, which) -> {
+                    String key = name.toLowerCase().replace(" ", "_") + "_notes_" + System.currentTimeMillis();
+                    categoryPrefs.edit().putString(key, name).apply();
+                    
+                    // Update order
+                    String order = categoryPrefs.getString("cats_order", "");
+                    if (!order.isEmpty()) order += ",";
+                    order += key;
+                    categoryPrefs.edit().putString("cats_order", order).apply();
+
+                    colorPrefs.edit().putInt("color_sb_" + key.replace("_notes", ""), colorValues[which]).apply();
+                    loadCategories();
+                    selectCategory(key, colorValues[which]);
+                })
+                .show();
+    }
+
+    private void showCategoryOptionsDialog(String key, Button button) {
+        String[] options = {"Rename", "Change Color", "Move Left", "Move Right", "Delete Category"};
+        new AlertDialog.Builder(this)
+                .setTitle("Category Options")
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) showRenameDialog(key, button);
+                    else if (which == 1) showColorPickerForExisting(key, button);
+                    else if (which == 2) moveCategory(key, -1);
+                    else if (which == 3) moveCategory(key, 1);
+                    else if (which == 4) showDeleteCategoryConfirm(key);
+                })
+                .show();
+    }
+
+    private void moveCategory(String key, int direction) {
+        String orderStr = categoryPrefs.getString("cats_order", "");
+        if (orderStr.isEmpty()) return;
+        List<String> order = new ArrayList<>(Arrays.asList(orderStr.split(",")));
+        int index = order.indexOf(key);
+        if (index == -1) return;
+        int newIndex = index + direction;
+        if (newIndex >= 0 && newIndex < order.size()) {
+            order.remove(index);
+            order.add(newIndex, key);
+            categoryPrefs.edit().putString("cats_order", String.join(",", order)).apply();
+            loadCategories();
         }
     }
 
-    private void hideAllSections() {
-        personalNotesSection.setVisibility(View.GONE);
-        passwordNotesSection.setVisibility(View.GONE);
-        familyNotesSection.setVisibility(View.GONE);
-        workNotesSection.setVisibility(View.GONE);
+    private void showRenameDialog(String key, Button button) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Rename Category");
+        final EditText input = new EditText(this);
+        input.setText(button.getText().toString());
+        builder.setView(input);
+        builder.setPositiveButton("OK", (d, w) -> {
+            String newName = input.getText().toString().trim();
+            if (!newName.isEmpty()) {
+                categoryPrefs.edit().putString(key, newName).apply();
+                button.setText(newName);
+            }
+        });
+        builder.setNegativeButton("Cancel", null);
+        builder.show();
     }
 
-    private void saveNote(String key, EditText input, GridLayout container, ScrollView scrollView) {
-        String note = input.getText().toString().trim();
-        if (note.isEmpty()) {
+    private void showColorPickerForExisting(String key, Button button) {
+        String[] colorNames = {"Green", "Blue", "Red", "Orange", "Purple", "Teal", "Grey", "Pink"};
+        int[] colorValues = {0xFF4CAF50, 0xFF2196F3, 0xFFF44336, 0xFFFF9800, 0xFF9C27B0, 0xFF009688, 0xFF9E9E9E, 0xFFE91E63};
+
+        new AlertDialog.Builder(this)
+                .setTitle("Pick New Color")
+                .setItems(colorNames, (dialog, which) -> {
+                    int color = colorValues[which];
+                    colorPrefs.edit().putInt("color_sb_" + key.replace("_notes", ""), color).apply();
+                    button.setBackgroundTintList(android.content.res.ColorStateList.valueOf(color));
+                    if (activeCategoryKey.equals(key)) selectCategory(key, color);
+                })
+                .show();
+    }
+
+    private void showDeleteCategoryConfirm(String key) {
+        new AlertDialog.Builder(this)
+                .setTitle("Delete Category")
+                .setMessage("Are you sure? This will delete the category and all notes inside it.")
+                .setPositiveButton("Yes", (dialog, which) -> {
+                    categoryPrefs.edit().remove(key).apply();
+                    securePrefs.edit().remove(key).apply();
+                    
+                    // Update order
+                    String orderStr = categoryPrefs.getString("cats_order", "");
+                    if (!orderStr.isEmpty()) {
+                        List<String> order = new ArrayList<>(Arrays.asList(orderStr.split(",")));
+                        order.remove(key);
+                        categoryPrefs.edit().putString("cats_order", String.join(",", order)).apply();
+                    }
+
+                    if (activeCategoryKey.equals(key)) notesSection.setVisibility(View.GONE);
+                    loadCategories();
+                })
+                .setNegativeButton("No", null)
+                .show();
+    }
+
+    private void saveNote() {
+        String title = noteTitleInput.getText().toString().trim();
+        String content = noteContentInput.getText().toString().trim();
+        if (content.isEmpty()) {
             Toast.makeText(this, "Please enter a note", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        String existingNotes = securePrefs.getString(key, "");
-        String updatedNotes = existingNotes.isEmpty() ? note : existingNotes + SEPARATOR + note;
-        securePrefs.edit().putString(key, updatedNotes).apply();
+        String fullNote = (title.isEmpty() ? "No Name" : title) + TITLE_SEP + content;
+        String existingNotes = securePrefs.getString(activeCategoryKey, "");
+        String updatedNotes = existingNotes.isEmpty() ? fullNote : existingNotes + SEPARATOR + fullNote;
+        securePrefs.edit().putString(activeCategoryKey, updatedNotes).apply();
 
-        input.setText("");
-        loadNotes(key, container);
-        scrollView.postDelayed(() -> scrollView.fullScroll(View.FOCUS_DOWN), 100);
+        noteTitleInput.setText("");
+        noteContentInput.setText("");
+        loadNotes(activeCategoryKey);
+        notesScrollView.postDelayed(() -> notesScrollView.fullScroll(View.FOCUS_DOWN), 100);
         Toast.makeText(this, "Note saved!", Toast.LENGTH_SHORT).show();
     }
 
-    private void loadNotes(String key, GridLayout container) {
-        container.removeAllViews();
+    private void loadNotes(String key) {
+        notesContainer.removeAllViews();
         String notesStr = securePrefs.getString(key, "");
         if (!notesStr.isEmpty()) {
             String[] rawArray = notesStr.split(SEPARATOR);
@@ -280,36 +341,51 @@ public class SecureBoxActivity extends AppCompatActivity {
             }
 
             int count = notesList.size();
-            container.setColumnCount(count == 1 ? 1 : 2);
+            notesContainer.setColumnCount(count == 1 ? 1 : 2);
 
             LayoutInflater inflater = LayoutInflater.from(this);
             for (int i = 0; i < count; i++) {
-                final String note = notesList.get(i);
-                final int index = i;
-                View noteView = inflater.inflate(R.layout.sticky_note_item, container, false);
-                TextView tv = noteView.findViewById(R.id.noteText);
-                MaterialCardView card = noteView.findViewById(R.id.cardView);
-
-                tv.setText(note);
-                applyFontSettings(tv, 14);
-
-                if (key.equals(PERSONAL_KEY)) {
-                    card.setCardBackgroundColor(colorPrefs.getInt("color_sb_personal", getColor(R.color.light_green)));
-                } else if (key.equals(PASSWORD_KEY)) {
-                    card.setCardBackgroundColor(colorPrefs.getInt("color_sb_password", getColor(R.color.unmellow_yellow)));
-                } else if (key.equals(FAMILY_KEY)) {
-                    card.setCardBackgroundColor(colorPrefs.getInt("color_sb_family", getColor(R.color.blue)));
-                } else if (key.equals(WORK_KEY)) {
-                    card.setCardBackgroundColor(colorPrefs.getInt("color_sb_work", getColor(R.color.honey)));
+                final String rawNote = notesList.get(i);
+                String title = "Note";
+                String content = rawNote;
+                if (rawNote.contains(TITLE_SEP)) {
+                    String[] parts = rawNote.split(TITLE_SEP);
+                    title = parts[0];
+                    content = parts.length > 1 ? parts[1] : "";
                 }
 
-                noteView.setOnClickListener(v -> showEditFullPage(key, index, note, container));
+                final int index = i;
+                final String finalTitle = title;
+                final String finalContent = content;
+
+                View noteView = inflater.inflate(R.layout.sticky_note_item, notesContainer, false);
+                TextView titleTv = noteView.findViewById(R.id.noteTitle);
+                TextView contentTv = noteView.findViewById(R.id.noteText);
+                MaterialCardView card = noteView.findViewById(R.id.cardView);
+
+                titleTv.setText(title);
+                contentTv.setText(content);
+                applyFontSettings(titleTv, 14);
+                applyFontSettings(contentTv, 12);
+
+                card.setCardBackgroundColor(activeCategoryColor);
+
+                View moveLeft = noteView.findViewById(R.id.moveLeftBtn);
+                View moveRight = noteView.findViewById(R.id.moveRightBtn);
+
+                moveLeft.setVisibility(i > 0 ? View.VISIBLE : View.INVISIBLE);
+                moveRight.setVisibility(i < count - 1 ? View.VISIBLE : View.INVISIBLE);
+
+                moveLeft.setOnClickListener(v -> moveNote(key, index, index - 1));
+                moveRight.setOnClickListener(v -> moveNote(key, index, index + 1));
+
+                noteView.setOnClickListener(v -> showEditFullPage(key, index, finalTitle, finalContent, notesContainer));
 
                 noteView.setOnLongClickListener(v -> {
-                    new androidx.appcompat.app.AlertDialog.Builder(this)
+                    new AlertDialog.Builder(this)
                             .setTitle("Delete Note")
                             .setMessage("Are you sure you want to delete this note?")
-                            .setPositiveButton("Yes", (dialog, which) -> deleteNote(key, index, container))
+                            .setPositiveButton("Yes", (dialog, which) -> deleteNote(key, index, notesContainer))
                             .setNegativeButton("No", null)
                             .show();
                     return true;
@@ -318,7 +394,7 @@ public class SecureBoxActivity extends AppCompatActivity {
                 GridLayout.LayoutParams params = new GridLayout.LayoutParams();
                 if (count == 1) {
                     params.width = (int) (getResources().getDisplayMetrics().widthPixels * 0.7);
-                    params.columnSpec = GridLayout.spec(0, 1, GridLayout.CENTER, 1f);
+                    params.columnSpec = GridLayout.spec(0, 1, GridLayout.START, 1f);
                 } else {
                     params.width = 0;
                     params.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1, 1f);
@@ -326,43 +402,40 @@ public class SecureBoxActivity extends AppCompatActivity {
                 params.height = GridLayout.LayoutParams.WRAP_CONTENT;
                 noteView.setLayoutParams(params);
 
-                container.addView(noteView);
+                notesContainer.addView(noteView);
             }
         }
     }
 
-    private void showEditFullPage(String key, int index, String currentText, GridLayout container) {
+    private void showEditFullPage(String key, int index, String currentTitle, String currentContent, GridLayout container) {
         android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
 
-        int bgColor;
-        int textColor = Color.BLACK;
-        if (key.equals(PERSONAL_KEY)) bgColor = colorPrefs.getInt("color_sb_personal", getColor(R.color.light_green));
-        else if (key.equals(PASSWORD_KEY)) bgColor = colorPrefs.getInt("color_sb_password", getColor(R.color.unmellow_yellow));
-        else if (key.equals(FAMILY_KEY)) bgColor = colorPrefs.getInt("color_sb_family", getColor(R.color.blue));
-        else if (key.equals(WORK_KEY)) bgColor = colorPrefs.getInt("color_sb_work", getColor(R.color.honey));
-        else bgColor = Color.BLACK;
+        int bgColor = activeCategoryColor;
+        int textColor = (bgColor == getColor(R.color.unmellow_yellow)) ? Color.BLACK : Color.BLACK; 
+        // Actually the current logic uses Black text for sticky notes, so let's stick with that.
 
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setBackgroundColor(bgColor);
         layout.setPadding(32, 32, 32, 32);
 
-        TextView title = new TextView(this);
-        title.setText("Edit Note");
-        title.setTextColor(textColor);
-        applyFontSettings(title, 20);
-        title.setPadding(0, 0, 0, 16);
-        layout.addView(title);
+        EditText titleEdit = new EditText(this);
+        titleEdit.setText(currentTitle);
+        titleEdit.setTextColor(textColor);
+        applyFontSettings(titleEdit, 22);
+        titleEdit.setHint("Title (Name)");
+        titleEdit.setPadding(0, 0, 0, 16);
+        layout.addView(titleEdit);
 
-        EditText edit = new EditText(this);
-        edit.setText(currentText);
-        edit.setTextColor(textColor);
-        applyFontSettings(edit, 18);
-        edit.setGravity(android.view.Gravity.START | android.view.Gravity.TOP);
-        edit.setBackground(null);
+        EditText contentEdit = new EditText(this);
+        contentEdit.setText(currentContent);
+        contentEdit.setTextColor(textColor);
+        applyFontSettings(contentEdit, 18);
+        contentEdit.setGravity(android.view.Gravity.START | android.view.Gravity.TOP);
+        contentEdit.setBackground(null);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
-        edit.setLayoutParams(lp);
-        layout.addView(edit);
+        contentEdit.setLayoutParams(lp);
+        layout.addView(contentEdit);
 
         LinearLayout btnLayout = new LinearLayout(this);
         btnLayout.setOrientation(LinearLayout.HORIZONTAL);
@@ -380,12 +453,7 @@ public class SecureBoxActivity extends AppCompatActivity {
         applyFontSettings(print, 14);
         print.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.BLACK));
         print.setTextColor(Color.WHITE);
-        print.setOnClickListener(v -> {
-            String textToPrint = edit.getText().toString().trim();
-            if (!textToPrint.isEmpty()) {
-                printSingleNote(textToPrint);
-            }
-        });
+        print.setOnClickListener(v -> printSingleNote(titleEdit.getText().toString() + "\n\n" + contentEdit.getText().toString()));
         btnLayout.addView(print);
 
         Button save = new Button(this);
@@ -394,9 +462,10 @@ public class SecureBoxActivity extends AppCompatActivity {
         save.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.BLACK));
         save.setTextColor(Color.WHITE);
         save.setOnClickListener(v -> {
-            String newText = edit.getText().toString().trim();
-            if (!newText.isEmpty()) {
-                updateNote(key, index, newText, container);
+            String newTitle = titleEdit.getText().toString().trim();
+            String newContent = contentEdit.getText().toString().trim();
+            if (!newContent.isEmpty()) {
+                updateNote(key, index, (newTitle.isEmpty() ? "No Name" : newTitle) + TITLE_SEP + newContent);
                 dialog.dismiss();
             }
         });
@@ -407,7 +476,7 @@ public class SecureBoxActivity extends AppCompatActivity {
         dialog.show();
     }
 
-    private void updateNote(String key, int index, String newText, GridLayout container) {
+    private void updateNote(String key, int index, String fullNote) {
         String notesStr = securePrefs.getString(key, "");
         if (notesStr.isEmpty()) return;
         String[] rawArray = notesStr.split(SEPARATOR);
@@ -418,11 +487,32 @@ public class SecureBoxActivity extends AppCompatActivity {
             }
         }
         if (index >= 0 && index < notesList.size()) {
-            notesList.set(index, newText);
+            notesList.set(index, fullNote);
             String updatedNotes = String.join(SEPARATOR, notesList);
             securePrefs.edit().putString(key, updatedNotes).apply();
-            loadNotes(key, container);
+            loadNotes(key);
             Toast.makeText(this, "Note updated", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void moveNote(String key, int fromIndex, int toIndex) {
+        String notesStr = securePrefs.getString(key, "");
+        if (notesStr.isEmpty()) return;
+
+        String[] rawArray = notesStr.split(SEPARATOR);
+        List<String> notesList = new ArrayList<>();
+        for (String s : rawArray) {
+            if (!s.trim().isEmpty()) {
+                notesList.add(s);
+            }
+        }
+
+        if (fromIndex >= 0 && fromIndex < notesList.size() && toIndex >= 0 && toIndex < notesList.size()) {
+            String note = notesList.remove(fromIndex);
+            notesList.add(toIndex, note);
+            String updatedNotes = String.join(SEPARATOR, notesList);
+            securePrefs.edit().putString(key, updatedNotes).apply();
+            loadNotes(key);
         }
     }
 
@@ -463,8 +553,57 @@ public class SecureBoxActivity extends AppCompatActivity {
             notesList.remove(index);
             String updatedNotes = String.join(SEPARATOR, notesList);
             securePrefs.edit().putString(key, updatedNotes).apply();
-            loadNotes(key, container);
+            loadNotes(key);
             Toast.makeText(this, "Note deleted", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void refreshColors() {
+        int mainTheme = colorPrefs.getInt("color_main_theme", getColor(R.color.light_green));
+        int bgColor = colorPrefs.getInt("color_app_background", Color.BLACK);
+
+        View root = findViewById(R.id.main);
+        if (root != null) root.setBackgroundColor(bgColor);
+
+        TextView title = findViewById(R.id.secureBoxTitle);
+        if (title != null) {
+            title.setTextColor(mainTheme);
+            applyFontSettings(title, 24);
+        }
+
+        if (noteTitleInput != null) applyFontSettings(noteTitleInput, 18);
+        if (noteContentInput != null) applyFontSettings(noteContentInput, 18);
+    }
+
+    private void applyFontSettings(TextView textView, float baseSize) {
+        int styleIndex = fontPrefs.getInt("font_style", 0);
+        Typeface tf = Typeface.DEFAULT;
+        switch (styleIndex) {
+            case 1: tf = Typeface.SANS_SERIF; break;
+            case 2: tf = Typeface.SERIF; break;
+            case 3: tf = Typeface.MONOSPACE; break;
+        }
+        textView.setTypeface(tf);
+
+        int sizeIndex = fontPrefs.getInt("font_size_index", 1);
+        float multiplier = 1.0f;
+        switch (sizeIndex) {
+            case 0: multiplier = 0.8f; break;
+            case 1: multiplier = 1.0f; break;
+            case 2: multiplier = 1.3f; break;
+            case 3: multiplier = 1.6f; break;
+        }
+        textView.setTextSize(baseSize * multiplier);
+    }
+
+    private void setupAutoScroll() {
+        View.OnFocusChangeListener scrollListener = (v, hasFocus) -> {
+            if (hasFocus) {
+                notesScrollView.postDelayed(() -> notesScrollView.fullScroll(View.FOCUS_DOWN), 300);
+            }
+        };
+
+        noteTitleInput.setOnFocusChangeListener(scrollListener);
+        noteContentInput.setOnFocusChangeListener(scrollListener);
     }
 }

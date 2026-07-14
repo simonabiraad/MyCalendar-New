@@ -21,116 +21,37 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <LinearLayout
-        android:id="@+id/buttonContainer"
-        android:layout_width="0dp"
+    <HorizontalScrollView
+        android:id="@+id/categoryScrollView"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="16dp"
-        android:orientation="horizontal"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
+        android:scrollbars="none"
         app:layout_constraintTop_toBottomOf="@id/secureBoxTitle">
 
-        <Button
-            android:id="@+id/personalButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="4dp"
-            android:layout_weight="1"
-            android:backgroundTint="@color/light_green"
-            android:padding="0dp"
-            android:text="Personal"
-            android:textColor="@color/white"
-            android:textSize="10sp" />
-
-        <Button
-            android:id="@+id/passwordButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="4dp"
-            android:layout_weight="1"
-            android:backgroundTint="@color/unmellow_yellow"
-            android:padding="0dp"
-            android:text="Password"
-            android:textColor="@color/black"
-            android:textSize="10sp" />
-
-        <Button
-            android:id="@+id/familyButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="4dp"
-            android:layout_weight="1"
-            android:backgroundTint="@color/blue"
-            android:padding="0dp"
-            android:text="Family"
-            android:textColor="@color/white"
-            android:textSize="10sp" />
-
-        <Button
-            android:id="@+id/workButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:backgroundTint="@color/honey"
-            android:padding="0dp"
-            android:text="Work"
-            android:textColor="@color/white"
-            android:textSize="10sp" />
-    </LinearLayout>
-
-    <!-- Personal Section -->
-    <LinearLayout
-        android:id="@+id/personalNotesSection"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_marginTop="8dp"
-        android:orientation="vertical"
-        android:padding="16dp"
-        android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/buttonContainer">
-
-        <EditText
-            android:id="@+id/personalNoteInput"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="Enter personal note..."
-            android:inputType="textMultiLine"
-            android:gravity="start|top"
-            android:minLines="1"
-            android:maxLines="5"
-            android:textColor="@color/white"
-            android:textColorHint="@color/white" />
-
-        <Button
-            android:id="@+id/savePersonalNoteButton"
+        <LinearLayout
+            android:id="@+id/buttonContainer"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="end"
-            android:backgroundTint="@color/light_green"
-            android:text="Save" />
+            android:orientation="horizontal">
 
-        <ScrollView
-            android:id="@+id/personalScrollView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginTop="8dp">
-            <GridLayout
-                android:id="@+id/personalNotesContainer"
-                android:layout_width="match_parent"
+            <!-- Category buttons will be here -->
+
+            <Button
+                android:id="@+id/addCategoryButton"
+                android:layout_width="48dp"
                 android:layout_height="wrap_content"
-                android:alignmentMode="alignMargins"
-                android:columnCount="2"
-                android:columnOrderPreserved="false" />
-        </ScrollView>
-    </LinearLayout>
+                android:backgroundTint="#444444"
+                android:padding="0dp"
+                android:text="+"
+                android:textColor="@color/white"
+                android:textSize="24sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </HorizontalScrollView>
 
-    <!-- Password Section -->
     <LinearLayout
-        android:id="@+id/passwordNotesSection"
+        android:id="@+id/notesSection"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_marginTop="8dp"
@@ -140,22 +61,31 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/buttonContainer">
+        app:layout_constraintTop_toBottomOf="@id/categoryScrollView">
 
         <EditText
-            android:id="@+id/passwordNoteInput"
+            android:id="@+id/noteTitleInput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Enter password note..."
+            android:hint="Title (Name)"
+            android:inputType="text"
+            android:textColor="@color/white"
+            android:textColorHint="@color/white" />
+
+        <EditText
+            android:id="@+id/noteContentInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Enter note..."
             android:inputType="textMultiLine"
             android:gravity="start|top"
             android:minLines="1"
-            android:maxLines="5"
+            android:maxLines="3"
             android:textColor="@color/white"
             android:textColorHint="@color/white" />
 
         <Button
-            android:id="@+id/savePasswordNoteButton"
+            android:id="@+id/saveStickyNoteButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="end"
@@ -163,110 +93,12 @@
             android:text="Save" />
 
         <ScrollView
-            android:id="@+id/passwordScrollView"
+            android:id="@+id/notesScrollView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_marginTop="8dp">
             <GridLayout
-                android:id="@+id/passwordNotesContainer"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:alignmentMode="alignMargins"
-                android:columnCount="2"
-                android:columnOrderPreserved="false" />
-        </ScrollView>
-    </LinearLayout>
-
-    <!-- Family Section -->
-    <LinearLayout
-        android:id="@+id/familyNotesSection"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_marginTop="8dp"
-        android:orientation="vertical"
-        android:padding="16dp"
-        android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/buttonContainer">
-
-        <EditText
-            android:id="@+id/familyNoteInput"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="Enter family note..."
-            android:inputType="textMultiLine"
-            android:gravity="start|top"
-            android:minLines="1"
-            android:maxLines="5"
-            android:textColor="@color/white"
-            android:textColorHint="@color/white" />
-
-        <Button
-            android:id="@+id/saveFamilyNoteButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="end"
-            android:backgroundTint="@color/light_green"
-            android:text="Save" />
-
-        <ScrollView
-            android:id="@+id/familyScrollView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginTop="8dp">
-            <GridLayout
-                android:id="@+id/familyNotesContainer"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:alignmentMode="alignMargins"
-                android:columnCount="2"
-                android:columnOrderPreserved="false" />
-        </ScrollView>
-    </LinearLayout>
-
-    <!-- Work Section -->
-    <LinearLayout
-        android:id="@+id/workNotesSection"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_marginTop="8dp"
-        android:orientation="vertical"
-        android:padding="16dp"
-        android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/buttonContainer">
-
-        <EditText
-            android:id="@+id/workNoteInput"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="Enter work note..."
-            android:inputType="textMultiLine"
-            android:gravity="start|top"
-            android:minLines="1"
-            android:maxLines="5"
-            android:textColor="@color/white"
-            android:textColorHint="@color/white" />
-
-        <Button
-            android:id="@+id/saveWorkNoteButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="end"
-            android:backgroundTint="@color/light_green"
-            android:text="Save" />
-
-        <ScrollView
-            android:id="@+id/workScrollView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginTop="8dp">
-            <GridLayout
-                android:id="@+id/workNotesContainer"
+                android:id="@+id/notesContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:alignmentMode="alignMargins"
