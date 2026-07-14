@@ -89,6 +89,8 @@ public class SecureBoxActivity extends AppCompatActivity {
         buttonContainer = findViewById(R.id.buttonContainer);
 
         findViewById(R.id.saveStickyNoteButton).setOnClickListener(v -> saveNote());
+        findViewById(R.id.moveCategoryLeftButton).setOnClickListener(v -> moveCategory(activeCategoryKey, -1));
+        findViewById(R.id.moveCategoryRightButton).setOnClickListener(v -> moveCategory(activeCategoryKey, 1));
         findViewById(R.id.addCategoryButton).setOnClickListener(v -> showAddCategoryDialog());
     }
 

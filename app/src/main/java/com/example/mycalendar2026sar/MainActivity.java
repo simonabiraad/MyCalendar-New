@@ -228,13 +228,13 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.mainMenuButton).setOnClickListener(v -> {
             android.widget.PopupMenu popup = new android.widget.PopupMenu(this, v);
             popup.getMenu().add("New Note");
-            popup.getMenu().add("Voice Note");
+            popup.getMenu().add("New Voice Note");
             popup.getMenu().add("New Sticky Note");
             popup.getMenu().add("Secure Box");
             popup.getMenu().add("Change Password");
             popup.getMenu().add("Notification Settings");
             popup.getMenu().add("Change Colors");
-            popup.getMenu().add("Font");
+            popup.getMenu().add("Change Font");
             popup.getMenu().add("Print");
             popup.getMenu().add("About");
             popup.getMenu().add("Exit");
@@ -244,7 +244,7 @@ public class MainActivity extends AppCompatActivity {
                 if (title.equals("New Note")) {
                     currentDialogInput = null;
                     showNewNoteDialog("");
-                } else if (title.equals("Voice Note")) {
+                } else if (title.equals("New Voice Note")) {
                     currentDialogInput = null;
                     startVoiceRecognition();
                 } else if (title.equals("New Sticky Note")) {
@@ -257,7 +257,7 @@ public class MainActivity extends AppCompatActivity {
                     findViewById(R.id.notificationSettingsButton).performClick();
                 } else if (title.equals("Change Colors")) {
                     showChangeColorsDialog();
-                } else if (title.equals("Font")) {
+                } else if (title.equals("Change Font")) {
                     showFontDialog();
                 } else if (title.equals("Print")) {
                     showPrintDialog();

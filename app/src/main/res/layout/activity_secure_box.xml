@@ -84,13 +84,44 @@
             android:textColor="@color/white"
             android:textColorHint="@color/white" />
 
-        <Button
-            android:id="@+id/saveStickyNoteButton"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="end"
-            android:backgroundTint="@color/light_green"
-            android:text="Save" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <Button
+                android:id="@+id/moveCategoryLeftButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:backgroundTint="#444444"
+                android:text="Move Left"
+                android:textColor="@color/white"
+                android:textSize="10sp" />
+
+            <Button
+                android:id="@+id/moveCategoryRightButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:backgroundTint="#444444"
+                android:text="Move Right"
+                android:textColor="@color/white"
+                android:textSize="10sp" />
+
+            <Button
+                android:id="@+id/saveStickyNoteButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:backgroundTint="@color/light_green"
+                android:text="Save"
+                android:textColor="@color/white"
+                android:textSize="10sp" />
+        </LinearLayout>
 
         <ScrollView
             android:id="@+id/notesScrollView"
